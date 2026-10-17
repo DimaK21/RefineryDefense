@@ -73,7 +73,7 @@ static void test_report_and_next_night(void) {
   CHECK_EQ(g.night, 2);
   CHECK_EQ(nights_survived(&g), 1);
   CHECK_EQ(g.stats.income, morning_income(&g));
-  CHECK_EQ(g.money, 150 + g.stats.bounty + g.stats.income);
+  CHECK_EQ(g.money, START_MONEY + g.stats.bounty + g.stats.income);
   CHECK(g.score >= SCORE_PER_NIGHT);
   CHECK(g.seed != seed1);
   sim_tick(&g, 40);

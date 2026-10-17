@@ -29,7 +29,7 @@ static void test_game_new(void) {
   game_new(&g, 1);
   CHECK_EQ(g.phase, PHASE_DAY);
   CHECK_EQ(g.night, 1);
-  CHECK_EQ(g.money, 150);
+  CHECK_EQ(g.money, 200);
   CHECK_EQ(g.objects[OBJ_DISTILLATION].status, OBJ_ALIVE);
   CHECK_EQ(g.objects[OBJ_DISTILLATION].hp, 100);
   CHECK_EQ(g.objects[OBJ_TANK_A].status, OBJ_ALIVE);
