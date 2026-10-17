@@ -36,3 +36,6 @@ extern const ObjectSpec OBJECT_SPECS[OBJ_COUNT];
 #define WAVE_EXTRA_OBJ_PCT 10
 #define EFFECT_MS 400
 #define TRACER_MS 120
+#define SWARM_INTERVAL_MS 300
+#define SWARM_MIN 3
+#define SWARM_MAX 5
