@@ -62,10 +62,11 @@ void sim_tick(Game *g, uint16_t dt_ms) {
   }
   if (alive_objects(g) == 0) { g->phase = PHASE_GAME_OVER; return; }
   if (g->wave_next < g->wave_len) return;
+  if (g->air_active) return;
   for (int i = 0; i < MAX_DRONES; i++) if (g->drones[i].active) return;
   g->stats.income = morning_income(g);
   g->money += g->stats.income;
-  g->score += 100;
+  g->score += SCORE_PER_NIGHT;
   g->night++;
   g->seed = rng_next(&g->rng);
   g->phase = PHASE_REPORT;

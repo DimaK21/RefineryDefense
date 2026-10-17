@@ -25,12 +25,40 @@ static void test_begin_and_full_night(void) {
   CHECK(g.phase == PHASE_NIGHT);
   CHECK(g.wave_len > 0);
   for (int i = 0; i < 3000 && g.phase == PHASE_NIGHT; i++) sim_tick(&g, 40);
-  CHECK(g.phase == PHASE_REPORT || g.phase == PHASE_GAME_OVER);
-  if (g.phase == PHASE_REPORT) {
-    CHECK_EQ(g.night, 2);
-    CHECK_EQ(g.money, 150 + g.stats.bounty + g.stats.income);
-    CHECK(g.score >= 100);
-  }
+  CHECK(g.phase == PHASE_REPORT);                  /* seed 3, undefended: survives night 1 */
+  CHECK_EQ(g.night, 2);
+  CHECK_EQ(g.stats.kills, 0);
+  CHECK_EQ(g.money, START_MONEY + g.stats.bounty + g.stats.income);
+  CHECK(g.score >= SCORE_PER_NIGHT);
+}
+
+static void test_defended_night(void) {
+  Game g; game_new(&g, 3);
+  int n = 0;
+  n += tower_buy(&g, TW_MG, 4, 8) == ACT_OK;
+  n += tower_buy(&g, TW_MG, 7, 8) == ACT_OK;
+  n += tower_buy(&g, TW_MG, 10, 8) == ACT_OK;
+  CHECK(n > 0);
+  int32_t spent = START_MONEY - g.money;
+  CHECK(night_begin(&g));
+  for (int i = 0; i < 3000 && g.phase == PHASE_NIGHT; i++) sim_tick(&g, 40);
+  CHECK(g.phase == PHASE_REPORT);
+  CHECK(g.stats.kills > 0);
+  CHECK_EQ(g.money, START_MONEY - spent + g.stats.bounty + g.stats.income);
+  CHECK_EQ(g.score, (uint32_t)g.stats.bounty + SCORE_PER_NIGHT);
+}
+
+static void test_night_waits_for_air(void) {
+  Game g; game_new(&g, 1);
+  night_begin(&g);
+  g.wave_len = 0; g.wave_next = 0;
+  g.money = 100;
+  CHECK(air_support_call(&g, at(50, 50)));
+  sim_tick(&g, 100);
+  CHECK(g.phase == PHASE_NIGHT);                   /* strike pending */
+  for (int i = 0; i < 14; i++) sim_tick(&g, 100);
+  CHECK(!g.air_active);
+  CHECK(g.phase == PHASE_REPORT);
 }
 
 static void test_report_and_next_night(void) {
@@ -46,7 +74,7 @@ static void test_report_and_next_night(void) {
   CHECK_EQ(nights_survived(&g), 1);
   CHECK_EQ(g.stats.income, morning_income(&g));
   CHECK_EQ(g.money, 150 + g.stats.bounty + g.stats.income);
-  CHECK(g.score >= 100);
+  CHECK(g.score >= SCORE_PER_NIGHT);
   CHECK(g.seed != seed1);
   sim_tick(&g, 40);
   CHECK(g.phase == PHASE_REPORT);                  /* no-op outside NIGHT */
@@ -124,6 +152,8 @@ static void test_take_events(void) {
 
 int main(void) {
   RUN(test_begin_and_full_night);
+  RUN(test_defended_night);
+  RUN(test_night_waits_for_air);
   RUN(test_report_and_next_night);
   RUN(test_air_support);
   RUN(test_air_not_in_day);
