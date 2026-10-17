@@ -12,12 +12,12 @@ const TowerSpec TOWER_SPECS[TW_COUNT] = {
 
 const DroneSpec DRONE_SPECS[DR_COUNT] = {
   /*                  name          spd hp dmg tdmg bounty night threat */
-  [DR_SWITCHBLADE] = {"Switchblade", 14, 2, 10, 1,  6, 1, 2},
-  [DR_SHAHED136]   = {"Shahed-136",   8, 6, 35, 0, 16, 2, 4},
-  [DR_GERBERA]     = {"Gerbera",      9, 2,  0, 0,  2, 3, 1},
+  [DR_SWITCHBLADE] = {"Switchblade", 14, 2, 10, 1,  3, 1, 2},
+  [DR_SHAHED136]   = {"Shahed-136",   8, 6, 35, 0,  8, 2, 4},
+  [DR_GERBERA]     = {"Gerbera",      9, 2,  0, 0,  1, 3, 1},
   /* Harpy damage (to objects) applies only when no towers remain */
-  [DR_HARPY]       = {"Harpy",       16, 3, 10, 4, 20, 4, 6},
-  [DR_SHAHED238]   = {"Shahed-238",  22, 6, 35, 0, 30, 6, 7},
+  [DR_HARPY]       = {"Harpy",       16, 3, 10, 4, 10, 4, 6},
+  [DR_SHAHED238]   = {"Shahed-238",  22, 6, 35, 0, 15, 6, 7},
 };
 
 const ObjectSpec OBJECT_SPECS[OBJ_COUNT] = {

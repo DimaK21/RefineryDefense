@@ -40,10 +40,10 @@ static void test_mg_kills_switchblade(void) {
   CHECK_EQ(g.effects[0].ttl_ms, TRACER_MS);
   combat_update(&g, 50);
   CHECK(!g.drones[0].active);
-  CHECK_EQ(g.money, 6);
+  CHECK_EQ(g.money, 3);
   CHECK_EQ(g.stats.kills, 1);
-  CHECK_EQ(g.stats.bounty, 6);
-  CHECK_EQ(g.score, 6);
+  CHECK_EQ(g.stats.bounty, 3);
+  CHECK_EQ(g.score, 3);
   CHECK(g.events & EV_EXPLOSION);
 }
 
@@ -116,7 +116,7 @@ static void test_missile_hit_and_stale(void) {
   h.money = 0;
   for (int i = 0; i < 40 && h.drones[0].active; i++) combat_update(&h, 40);
   CHECK(!h.drones[0].active);
-  CHECK_EQ(h.money, 16);
+  CHECK_EQ(h.money, 8);
 }
 
 static void test_target_choice(void) {

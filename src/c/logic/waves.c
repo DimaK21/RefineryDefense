@@ -4,7 +4,7 @@
 
 int32_t wave_budget(uint16_t night, int alive_objects) {
   int extra = alive_objects > 2 ? alive_objects - 2 : 0;
-  return (WAVE_BASE + WAVE_PER_NIGHT * (int32_t)night) * (100 + WAVE_EXTRA_OBJ_PCT * extra) / 100;
+  return (WAVE_BASE + WAVE_PER_NIGHT * (int32_t)night + (int32_t)night * night * WAVE_NIGHT_SQ) * (100 + WAVE_EXTRA_OBJ_PCT * extra) / 100;
 }
 
 static int side_count(uint16_t night) { return night <= 2 ? 1 : night <= 5 ? 2 : 4; }

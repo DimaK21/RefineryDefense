@@ -18,7 +18,7 @@ extern const TowerSpec TOWER_SPECS[TW_COUNT];
 extern const DroneSpec DRONE_SPECS[DR_COUNT];
 extern const ObjectSpec OBJECT_SPECS[OBJ_COUNT];
 
-#define START_MONEY 200
+#define START_MONEY 240
 #define SELL_REFUND_PCT 50
 #define TOWER_REPAIR_PCT 30
 #define REBUILD_PCT 150
@@ -33,7 +33,8 @@ extern const ObjectSpec OBJECT_SPECS[OBJ_COUNT];
 #define SWITCHBLADE_TOWER_PCT 20
 #define HIT_RADIUS 4
 #define WAVE_BASE 10
-#define WAVE_PER_NIGHT 6
+#define WAVE_PER_NIGHT 0
+#define WAVE_NIGHT_SQ 1   /* + night^2 * WAVE_NIGHT_SQ threat points */
 #define WAVE_EXTRA_OBJ_PCT 10
 #define EFFECT_MS 400
 #define TRACER_MS 120

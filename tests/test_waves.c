@@ -6,7 +6,7 @@
 static int threat(const WaveEntry *e) { return DRONE_SPECS[e->type].threat; }
 
 static void test_waves(void) {
-  CHECK_EQ(wave_budget(1, 2), 16); CHECK_EQ(wave_budget(1, 4), 19); CHECK_EQ(wave_budget(10, 1), 70);
+  CHECK_EQ(wave_budget(1, 2), 11); CHECK_EQ(wave_budget(1, 4), 13); CHECK_EQ(wave_budget(10, 1), 110);
   WaveEntry w[MAX_WAVE], w2[MAX_WAVE];
   uint16_t n = wave_generate(w, MAX_WAVE, 1, 2, 123);
   CHECK(n > 0);

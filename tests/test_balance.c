@@ -5,7 +5,7 @@
 #include "sim.h"
 
 #define SEEDS 20
-#define MAX_NIGHTS 20   /* lowered from 60 to keep the run to a few seconds */
+#define MAX_NIGHTS 60
 #define TICKS_CAP 5000
 
 static int cmp_int(const void *a, const void *b) { return *(const int *)a - *(const int *)b; }
@@ -53,14 +53,14 @@ static void bot_morning(Game *g) {
   int c, r;
   if (!has_radar(g) && nearest_free(g, 8, 9, &c, &r)) tower_buy(g, TW_RADAR, c, r);
   int turn = 0, obj = 0, fails = 0;
-  while (fails < 2 * OBJ_COUNT) {                 /* until money runs out / no room */
+  while (fails < 2 * OBJ_COUNT && alive_objects(g) > 0) {   /* until money runs out / no room */
     while (g->objects[obj % OBJ_COUNT].status != OBJ_ALIVE) obj++;
     ObjectId o = (ObjectId)(obj % OBJ_COUNT); obj++;
     TowerType t = (turn & 1) ? TW_TOR : TW_GEPARD;
+    if (t == TW_TOR && g->money < TOWER_SPECS[TW_TOR].cost) t = TW_GEPARD;
     if (ring_free(g, o, &c, &r) && tower_buy(g, t, c, r) == ACT_OK) { turn++; fails = 0; }
     else fails++;
     if (g->money < TOWER_SPECS[TW_GEPARD].cost) break;
-    if (alive_objects(g) == 0) break;
   }
 }
 
@@ -72,6 +72,7 @@ static int run(uint32_t seed, int smart, int *lost_night) {
     if (smart) bot_morning(&g);
     night_begin(&g);
     for (int i = 0; i < TICKS_CAP && g.phase == PHASE_NIGHT; i++) sim_tick(&g, 40);
+    CHECK(g.phase != PHASE_NIGHT);                 /* a night must end within the tick cap */
     if (g.phase == PHASE_GAME_OVER) { *lost_night = g.night; return nights_survived(&g); }
     if (g.phase != PHASE_REPORT) break;
     report_ack(&g);
@@ -92,8 +93,11 @@ static void test_balance(void) {
   qsort(sorted, SEEDS, sizeof(int), cmp_int);
   int median = sorted[SEEDS / 2];                  /* upper median: sorted[10] */
   printf("bot median (sorted[10]) = %d, min %d, max %d\n", median, sorted[0], sorted[SEEDS - 1]);
-  CHECK(median >= 5);
-  CHECK(median < MAX_NIGHTS);
+  int capped = 0; for (int s = 0; s < SEEDS; s++) capped += smart[s] >= MAX_NIGHTS;
+  printf("seeds reaching the %d-night cap: %d\n", MAX_NIGHTS, capped);
+  CHECK(median >= 6);
+  CHECK(median <= 20);
+  CHECK(capped <= 2);
   CHECK(idle_ok);
 }
 
