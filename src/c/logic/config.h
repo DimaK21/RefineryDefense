@@ -39,3 +39,9 @@ extern const ObjectSpec OBJECT_SPECS[OBJ_COUNT];
 #define SWARM_INTERVAL_MS 300
 #define SWARM_MIN 3
 #define SWARM_MAX 5
+#define OBJECT_CELLS 2
+#define OBJECT_MAX_HP 100
+#define WOBBLE_RATE 44
+#define WAYPOINT_JITTER 30
+#define WOBBLE_AMP_MIN 3
+#define WOBBLE_AMP_MAX 8

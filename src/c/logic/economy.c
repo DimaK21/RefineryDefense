@@ -11,9 +11,9 @@ void game_new(Game *g, uint32_t seed) {
   g->night = 1;
   g->money = START_MONEY;
   g->objects[OBJ_DISTILLATION].status = OBJ_ALIVE;
-  g->objects[OBJ_DISTILLATION].hp = 100;
+  g->objects[OBJ_DISTILLATION].hp = OBJECT_MAX_HP;
   g->objects[OBJ_TANK_A].status = OBJ_ALIVE;
-  g->objects[OBJ_TANK_A].hp = 100;
+  g->objects[OBJ_TANK_A].hp = OBJECT_MAX_HP;
 }
 
 int alive_objects(const Game *g) {
@@ -37,7 +37,7 @@ int object_at(const Game *g, int col, int row) {
   (void)g;
   for (int o = 0; o < OBJ_COUNT; o++) {
     const ObjectSpec *s = &OBJECT_SPECS[o];
-    if (col >= s->col && col < s->col + 2 && row >= s->row && row < s->row + 2) return o;
+    if (col >= s->col && col < s->col + OBJECT_CELLS && row >= s->row && row < s->row + OBJECT_CELLS) return o;
   }
   return -1;
 }
@@ -125,7 +125,7 @@ int32_t object_action_cost(const Game *g, ObjectId o) {
   int32_t bc = OBJECT_SPECS[o].build_cost;
   switch (g->objects[o].status) {
     case OBJ_NOT_BUILT: return bc;
-    case OBJ_ALIVE: return bc * (100 - g->objects[o].hp) / 100;
+    case OBJ_ALIVE: return bc * (OBJECT_MAX_HP - g->objects[o].hp) / OBJECT_MAX_HP;
     case OBJ_DESTROYED: return bc * REBUILD_PCT / 100;
   }
   return 0;
@@ -138,7 +138,7 @@ ActResult object_action(Game *g, ObjectId o) {
   if (g->money < cost) return ACT_NO_MONEY;
   g->money -= cost;
   g->objects[o].status = OBJ_ALIVE;
-  g->objects[o].hp = 100;
+  g->objects[o].hp = OBJECT_MAX_HP;
   return ACT_OK;
 }
 
