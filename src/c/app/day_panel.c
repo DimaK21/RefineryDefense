@@ -11,9 +11,10 @@ typedef struct { BtnAct act; const char *top; char bottom[16]; int16_t w; bool e
 
 static PanelKind s_kind;
 static int s_idx;
+static bool s_sell_armed;   /* first Sell tap asks "Sure?", the second one sells */
 
-void day_panel_open(PanelKind kind, int idx) { s_kind = kind; s_idx = idx; }
-void day_panel_close(void) { s_kind = PANEL_NONE; }
+void day_panel_open(PanelKind kind, int idx) { s_kind = kind; s_idx = idx; s_sell_armed = false; }
+void day_panel_close(void) { s_kind = PANEL_NONE; s_sell_armed = false; }
 PanelKind day_panel_kind(void) { return s_kind; }
 int day_panel_index(void) { return s_idx; }
 
@@ -30,7 +31,7 @@ static int prv_buttons(const Game *g, int16_t width, Btn *out) {
   if (s_kind == PANEL_TOWER) {
     int16_t w = width / MAX_BTNS;
     out[n] = (Btn){BTN_MOVE, "Move", "", w, true, false}; n++;
-    out[n] = (Btn){BTN_SELL, "Sell", "", w, true, false};
+    out[n] = (Btn){BTN_SELL, s_sell_armed ? "Sure?" : "Sell", "", w, true, false};
     snprintf(out[n].bottom, sizeof(out[n].bottom), "+$%ld", (long)tower_sell_value(g, s_idx)); n++;
     prv_cost_btn(&out[n++], BTN_REPAIR, "Repair", tower_repair_cost(g, s_idx), g->money, w);
     prv_cost_btn(&out[n++], BTN_RELOAD, "Reload", tower_reload_cost(g, s_idx), g->money, w);
@@ -58,6 +59,10 @@ void day_panel_draw(GContext *ctx, GRect area, const Game *g) {
   for (int i = 0; i < n; i++) {
     const Btn *b = &btns[i];
     GRect r = GRect(x, area.origin.y, b->w, area.size.h);
+    if (b->act == BTN_SELL && s_sell_armed) {
+      graphics_context_set_fill_color(ctx, COL_NO_MONEY);
+      graphics_fill_rect(ctx, r, 0, GCornerNone);
+    }
     graphics_context_set_stroke_color(ctx, GColorBlack);
     graphics_draw_rect(ctx, r);
     GColor top = b->enabled ? COL_BAR_TEXT : COL_DISABLED;
@@ -89,11 +94,14 @@ PanelResult day_panel_tap(Game *g, GRect area, int16_t x, int16_t y) {
   for (int i = 0; i < n; i++) {
     const Btn *b = &btns[i];
     if (x >= bx && x < bx + b->w) {
+      bool confirm = b->act == BTN_SELL && s_sell_armed;
+      s_sell_armed = false;   /* any other tap disarms */
       if (!b->enabled) return PANEL_RES_NONE;
       switch (b->act) {
         case BTN_MOVE:   day_panel_close(); return PANEL_RES_MOVE;
         case BTN_CLOSE:  day_panel_close(); return PANEL_RES_CLOSED;
         case BTN_SELL:
+          if (!confirm) { s_sell_armed = true; return PANEL_RES_NONE; }
           if (tower_sell(g, s_idx) != ACT_OK) return PANEL_RES_NONE;
           day_panel_close();
           return PANEL_RES_CLOSED;
@@ -104,5 +112,6 @@ PanelResult day_panel_tap(Game *g, GRect area, int16_t x, int16_t y) {
     }
     bx += b->w;
   }
+  s_sell_armed = false;
   return PANEL_RES_NONE;
 }
