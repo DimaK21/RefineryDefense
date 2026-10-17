@@ -15,7 +15,8 @@ const DroneSpec DRONE_SPECS[DR_COUNT] = {
   [DR_SWITCHBLADE] = {"Switchblade", 14, 2, 10, 1,  3, 1, 2},
   [DR_SHAHED136]   = {"Shahed-136",   8, 6, 35, 0,  8, 2, 4},
   [DR_GERBERA]     = {"Gerbera",      9, 2,  0, 0,  1, 3, 1},
-  [DR_HARPY]       = {"Harpy",       16, 3,  0, 4, 10, 4, 6},
+  /* Harpy damage (to objects) applies only when no towers remain */
+  [DR_HARPY]       = {"Harpy",       16, 3, 10, 4, 10, 4, 6},
   [DR_SHAHED238]   = {"Shahed-238",  22, 6, 35, 0, 15, 6, 7},
 };
 

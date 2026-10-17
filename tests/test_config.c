@@ -7,6 +7,7 @@ static void test_specs(void) {
   CHECK_EQ(TOWER_SPECS[TW_PATRIOT].ammo, 3);
   CHECK_EQ(DRONE_SPECS[DR_SHAHED238].first_night, 6);
   CHECK_EQ(DRONE_SPECS[DR_GERBERA].damage, 0);
+  CHECK_EQ(DRONE_SPECS[DR_HARPY].damage, 10);
   CHECK_EQ(OBJECT_SPECS[OBJ_CRACKER].income, 40);
 }
 
