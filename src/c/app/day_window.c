@@ -19,6 +19,7 @@
 #define MINI_W 46
 #define MINI_H 44
 #define MINI_MARGIN 2
+#define START_CONFIRM_MS 2000   /* UI tuning: a second Start tap / Select within this starts the night */
 
 static Window *s_window;
 static Layer *s_map_layer;      /* viewport between HUD and bar; camera space */
@@ -34,6 +35,8 @@ static bool s_ghost;
 static int s_ghost_col, s_ghost_row;
 static bool s_move;
 static int s_move_idx;
+static bool s_start_armed;      /* first Start tap / Select arms, the second one confirms */
+static AppTimer *s_start_timer;
 
 /* ---- layout ---- */
 
@@ -114,6 +117,15 @@ static void prv_draw_bar(GContext *ctx, const Game *g) {
   GRect bar = prv_bar_rect();
   graphics_context_set_fill_color(ctx, COL_BAR_BG);
   graphics_fill_rect(ctx, bar, 0, GCornerNone);
+  GRect play = GRect(TW_COUNT * SLOT_W, bar.origin.y, bar.size.w - TW_COUNT * SLOT_W, BAR_H);
+  if (s_start_armed) {
+    prv_text(ctx, "Tap again to start night", GRect(0, bar.origin.y + 5, play.origin.x, 18),
+             GTextAlignmentCenter, COL_SELECT);
+    graphics_context_set_fill_color(ctx, COL_SELECT);
+    graphics_fill_rect(ctx, play, 0, GCornerNone);
+    prv_draw_play(ctx, play);
+    return;
+  }
   if (s_move) {
     prv_text(ctx, "Tap a free cell to move", GRect(0, bar.origin.y + 5, bar.size.w, 18),
              GTextAlignmentCenter, COL_BAR_TEXT);
@@ -133,7 +145,7 @@ static void prv_draw_bar(GContext *ctx, const Game *g) {
     prv_text(ctx, buf, GRect(slot.origin.x, slot.origin.y + 11, SLOT_W, 16), GTextAlignmentCenter,
              g->money < TOWER_SPECS[t].cost ? COL_NO_MONEY : COL_BAR_TEXT);
   }
-  prv_draw_play(ctx, GRect(TW_COUNT * SLOT_W, bar.origin.y, bar.size.w - TW_COUNT * SLOT_W, BAR_H));
+  prv_draw_play(ctx, play);
 }
 
 static GPoint prv_mini_pt(GRect m, int wx, int wy) {
@@ -190,10 +202,34 @@ static void prv_start_night(void) {
   if (night_begin(g)) app_go_night();
 }
 
+static void prv_disarm_start(void) {
+  if (s_start_timer) { app_timer_cancel(s_start_timer); s_start_timer = NULL; }
+  s_start_armed = false;
+}
+
+static void prv_start_timeout(void *ctx) {
+  s_start_timer = NULL;
+  s_start_armed = false;
+  prv_dirty();
+}
+
+/* Two-step start: the night cannot be undone, so one stray tap or press only arms it. */
+static void prv_request_start(void) {
+  if (s_start_armed) {
+    prv_disarm_start();
+    prv_start_night();
+    return;
+  }
+  day_panel_close();
+  s_move = false;
+  s_start_armed = true;
+  s_start_timer = app_timer_register(START_CONFIRM_MS, prv_start_timeout, NULL);
+}
+
 static void prv_tap_bar(int16_t x) {
   int slot = x / SLOT_W;
   if (slot < TW_COUNT) s_sel = (TowerType)slot;
-  else prv_start_night();
+  else prv_request_start();
 }
 
 static void prv_tap_cell(Game *g, int col, int row) {
@@ -224,6 +260,11 @@ static void prv_tap(int16_t x, int16_t y) {
   Game *g = app_game();
   GPoint p = GPoint(x, y);
   GRect bar = prv_bar_rect(), mini = prv_mini_rect(), map = prv_map_rect();
+  if (s_start_armed) {   /* only the Start button confirms; any other tap just disarms */
+    if (grect_contains_point(&bar, &p) && x >= TW_COUNT * SLOT_W) prv_request_start();
+    else prv_disarm_start();
+    return;
+  }
   if (day_panel_kind() != PANEL_NONE) {
     if (grect_contains_point(&bar, &p)) {
       if (day_panel_tap(g, bar, x, y) == PANEL_RES_MOVE) {
@@ -281,13 +322,17 @@ static void prv_touch(const TouchEvent *e, void *ctx) {
 }
 
 static void prv_cycle(int step) {
+  prv_disarm_start();
   s_sel = (TowerType)((s_sel + TW_COUNT + step) % TW_COUNT);
   prv_dirty();
 }
 
 static void prv_up(ClickRecognizerRef r, void *ctx) { prv_cycle(-1); }
 static void prv_down(ClickRecognizerRef r, void *ctx) { prv_cycle(1); }
-static void prv_select(ClickRecognizerRef r, void *ctx) { prv_start_night(); }
+static void prv_select(ClickRecognizerRef r, void *ctx) {
+  prv_request_start();
+  prv_dirty();
+}
 
 static void prv_back(ClickRecognizerRef r, void *ctx) {
   storage_save(app_game(), false);
@@ -309,6 +354,7 @@ static void prv_load(Window *w) {
   s_sel = TW_MG;
   s_ghost = false;
   s_move = false;
+  s_start_armed = false;
   day_panel_close();
   prv_center_camera();
   s_map_layer = layer_create(prv_map_rect());
@@ -320,6 +366,9 @@ static void prv_load(Window *w) {
 }
 
 static void prv_unload(Window *w) {
+  prv_disarm_start();
+  /* a long-press Back exit skips prv_back: keep the day's purchases */
+  if (app_game()->phase == PHASE_DAY) storage_save(app_game(), false);
   layer_destroy(s_ui_layer);
   s_ui_layer = NULL;
   layer_destroy(s_map_layer);
