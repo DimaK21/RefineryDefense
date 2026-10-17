@@ -15,7 +15,7 @@
 #define TICK_MS 40
 #define MAX_CATCHUP_MS 200   /* real ms simulated per callback at most: a stall must not teleport drones */
 #define HUD_H 14
-#define MARK_CONFIRM_PX 12   /* UI tuning: a tap this close to the marker confirms Air Support */
+#define MARK_CONFIRM_PX 20   /* UI tuning: a tap this close to the marker confirms Air Support */
 #define MARK_TTL_MS 3000     /* UI tuning: the marker disappears this long after its last placement */
 
 static Window *s_window;
@@ -115,7 +115,13 @@ static void prv_schedule(void) {
 }
 
 static void prv_finish_night(Game *g) {
-  if (g->phase == PHASE_REPORT) { app_go_report(); return; }
+  if (g->phase == PHASE_REPORT) {
+    /* Income and night++ are already applied: the save loads as the next DAY, and the
+       report's own save after report_ack writes the same state. */
+    storage_save(g, false);
+    app_go_report();
+    return;
+  }
   Best b = storage_best();
   bool record = best_update(&b, nights_survived(g), g->score);
   if (record) storage_set_best(b);
@@ -153,6 +159,11 @@ static void prv_set_paused(bool paused) {
     prv_schedule();
   }
   layer_mark_dirty(s_layer);
+}
+
+static void prv_focus(bool in_focus) {
+  /* a notification or system overlay: the night must not run unseen */
+  if (!in_focus && !s_paused && app_game()->phase == PHASE_NIGHT) prv_set_paused(true);
 }
 
 /* ---- input ---- */
@@ -208,9 +219,11 @@ static void prv_load(Window *w) {
   s_clock = (TouchClock){0};
   s_last_ms = prv_now_ms();
   prv_schedule();
+  app_focus_service_subscribe_handlers((AppFocusHandlers){ .will_focus = prv_focus });
 }
 
 static void prv_unload(Window *w) {
+  app_focus_service_unsubscribe();
   if (s_timer) { app_timer_cancel(s_timer); s_timer = NULL; }
   layer_destroy(s_layer);
   s_layer = NULL;

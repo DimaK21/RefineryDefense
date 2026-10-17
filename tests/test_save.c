@@ -100,6 +100,29 @@ static void test_blob(void) {
   CHECK(!save_read_blob(&b, &pending, buf, SAVE_LEN));      /* validation still applies */
 }
 
+/* A save taken at REPORT (before the report is dismissed) loads as the next DAY, and the
+   save written after report_ack is byte-identical: no double income on Continue. */
+static void test_save_at_report(void) {
+  static Game g, b;
+  game_new(&g, 3);
+  CHECK(night_begin(&g));
+  for (int i = 0; i < 20000 && g.phase == PHASE_NIGHT; i++) sim_tick(&g, 40);
+  CHECK(g.phase == PHASE_REPORT);
+  uint8_t at_report[SAVE_LEN], after_ack[SAVE_LEN];
+  CHECK_EQ(save_write(&g, false, at_report, sizeof at_report), SAVE_LEN);
+  int32_t money = g.money;
+  report_ack(&g);
+  CHECK_EQ(g.money, money);
+  CHECK_EQ(save_write(&g, false, after_ack, sizeof after_ack), SAVE_LEN);
+  CHECK(memcmp(at_report, after_ack, SAVE_LEN) == 0);
+  bool pending = true;
+  CHECK(save_read_blob(&b, &pending, at_report, SAVE_LEN));
+  CHECK(!pending);
+  CHECK(b.phase == PHASE_DAY);
+  CHECK_EQ(b.night, 2);
+  CHECK_EQ(b.money, money);
+}
+
 static void test_wave_identical(void) {
   Game a, b; memset(&b, 0, sizeof b); game_new(&a, 11);
   a.night = 3; a.objects[OBJ_TERMINAL].status = OBJ_ALIVE; a.objects[OBJ_TERMINAL].hp = 100;
@@ -165,7 +188,7 @@ static void test_best(void) {
 }
 
 int main(void) {
-  RUN(test_sizes); RUN(test_roundtrip); RUN(test_blob); RUN(test_wave_identical);
+  RUN(test_sizes); RUN(test_roundtrip); RUN(test_blob); RUN(test_save_at_report); RUN(test_wave_identical);
   RUN(test_rejects); RUN(test_best);
   return TEST_SUMMARY();
 }
