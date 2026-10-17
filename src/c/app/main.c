@@ -1,60 +1,34 @@
 #include <pebble.h>
+#include "app.h"
+#include "menu_window.h"
+#include "touch_off_window.h"
+#include "day_window.h"
+#include "night_window.h"
+#include "report_window.h"
+#include "gameover_window.h"
 
-static Window *s_window;
-static TextLayer *s_text_layer;
+static Game s_game;
 
-static void prv_select_click_handler(ClickRecognizerRef recognizer, void *context) {
-  text_layer_set_text(s_text_layer, "Select");
-}
+Game *app_game(void) { return &s_game; }
 
-static void prv_up_click_handler(ClickRecognizerRef recognizer, void *context) {
-  text_layer_set_text(s_text_layer, "Up");
-}
-
-static void prv_down_click_handler(ClickRecognizerRef recognizer, void *context) {
-  text_layer_set_text(s_text_layer, "Down");
-}
-
-static void prv_click_config_provider(void *context) {
-  window_single_click_subscribe(BUTTON_ID_SELECT, prv_select_click_handler);
-  window_single_click_subscribe(BUTTON_ID_UP, prv_up_click_handler);
-  window_single_click_subscribe(BUTTON_ID_DOWN, prv_down_click_handler);
-}
-
-static void prv_window_load(Window *window) {
-  Layer *window_layer = window_get_root_layer(window);
-  GRect bounds = layer_get_bounds(window_layer);
-
-  s_text_layer = text_layer_create(GRect(0, 72, bounds.size.w, 20));
-  text_layer_set_text(s_text_layer, "Press a button");
-  text_layer_set_text_alignment(s_text_layer, GTextAlignmentCenter);
-  layer_add_child(window_layer, text_layer_get_layer(s_text_layer));
-}
-
-static void prv_window_unload(Window *window) {
-  text_layer_destroy(s_text_layer);
-}
-
-static void prv_init(void) {
-  s_window = window_create();
-  window_set_click_config_provider(s_window, prv_click_config_provider);
-  window_set_window_handlers(s_window, (WindowHandlers) {
-    .load = prv_window_load,
-    .unload = prv_window_unload,
-  });
-  const bool animated = true;
-  window_stack_push(s_window, animated);
-}
-
-static void prv_deinit(void) {
-  window_destroy(s_window);
-}
+void app_go_menu(void) { window_stack_pop_all(false); menu_window_push(); }
+void app_go_day(void) { window_stack_pop_all(false); day_window_push(); }
+void app_go_night(void) { window_stack_pop_all(false); night_window_push(); }
+void app_go_report(void) { window_stack_pop_all(false); report_window_push(); }
+void app_go_gameover(void) { window_stack_pop_all(false); gameover_window_push(); }
 
 int main(void) {
-  prv_init();
-
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "Done initializing, pushed window: %p", s_window);
-
+  if (touch_service_is_enabled()) {
+    menu_window_push();
+  } else {
+    touch_off_window_push();
+  }
   app_event_loop();
-  prv_deinit();
+  window_stack_pop_all(false);
+  menu_window_destroy();
+  touch_off_window_destroy();
+  day_window_destroy();
+  night_window_destroy();
+  report_window_destroy();
+  gameover_window_destroy();
 }
