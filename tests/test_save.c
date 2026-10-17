@@ -7,6 +7,7 @@
 
 static void test_sizes(void) {
   CHECK(SAVE_HDR_LEN <= 256 && SAVE_TOWERS_LEN <= 256);
+  CHECK_EQ(SAVE_TOWERS_LEN, 1 + 5 * MAX_TOWERS);
 }
 
 static void setup(Game *g) {
@@ -24,7 +25,7 @@ static void setup(Game *g) {
 }
 
 static void test_roundtrip(void) {
-  Game a, b; setup(&a);
+  Game a, b; memset(&b, 0, sizeof b); setup(&a);
   uint8_t h[SAVE_HDR_LEN], t[SAVE_TOWERS_LEN];
   CHECK_EQ(save_write_header(&a, true, h, sizeof h), SAVE_HDR_LEN);
   CHECK_EQ(save_write_towers(&a, t, sizeof t), SAVE_TOWERS_LEN);
@@ -61,7 +62,7 @@ static void test_roundtrip(void) {
 }
 
 static void test_wave_identical(void) {
-  Game a, b; game_new(&a, 11);
+  Game a, b; memset(&b, 0, sizeof b); game_new(&a, 11);
   a.night = 3; a.objects[OBJ_TERMINAL].status = OBJ_ALIVE; a.objects[OBJ_TERMINAL].hp = 100;
   uint8_t h[SAVE_HDR_LEN], t[SAVE_TOWERS_LEN];
   save_write_header(&a, true, h, sizeof h);
