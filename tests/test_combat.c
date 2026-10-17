@@ -65,6 +65,44 @@ static void test_visibility(void) {
   CHECK(!drone_identified(&g, 2));
 }
 
+static void test_range_boundary(void) {
+  Game g; game_new(&g, 1); g.money = 1000;
+  tower_buy(&g, TW_MG, 5, 5);                               /* center (66,66), engage 13 */
+  Vec c = at(66, 66);
+  Vec p = {c.x + 13 * FX, c.y + 1};                         /* floor dist == 13*FX: in range */
+  put_drone(&g, 0, DR_SWITCHBLADE, p, at(70, 200), 1);
+  CHECK(drone_visible(&g, 0));
+  p.x += 1;                                                 /* one Q8 step further: out */
+  put_drone(&g, 1, DR_SWITCHBLADE, p, at(70, 200), 2);
+  CHECK(!drone_visible(&g, 1));
+  combat_update(&g, 40);
+  CHECK(g.drones[0].hp < DRONE_SPECS[DR_SWITCHBLADE].hp);   /* the in-range one was shot */
+  CHECK_EQ(g.drones[1].hp, DRONE_SPECS[DR_SWITCHBLADE].hp);
+}
+
+static void test_engage_cache(void) {
+  Game g; game_new(&g, 1); g.money = 100000;
+  CHECK_EQ(tower_buy(&g, TW_MG, 5, 5), ACT_OK);
+  CHECK_EQ(tower_buy(&g, TW_RADAR, 6, 5), ACT_OK);
+  CHECK_EQ(tower_buy(&g, TW_PATRIOT, 14, 17), ACT_OK);     /* far from the radar */
+  CHECK_EQ(tower_buy(&g, TW_JAMMER, 1, 17), ACT_OK);       /* not firing */
+  int32_t r[MAX_TOWERS];
+  combat_engage_ranges(&g, r);
+  CHECK_EQ(r[0], 22 * FX);
+  CHECK_EQ(r[1], 0);                                        /* radar does not fire */
+  CHECK_EQ(r[2], 48 * FX);
+  CHECK_EQ(r[3], 0);
+  for (int i = 4; i < MAX_TOWERS; i++) CHECK_EQ(r[i], 0);
+  for (int i = 0; i < MAX_DRONES; i++)
+    put_drone(&g, i, i % DR_COUNT, at(4 + (i * 37) % 192, 4 + (i * 53) % 220), at(100, 100), (uint16_t)(i + 1));
+  int vis = 0;
+  for (int i = 0; i < MAX_DRONES; i++) {
+    CHECK_EQ(drone_visible_in(&g, i, r), drone_visible(&g, i));
+    vis += drone_visible(&g, i);
+  }
+  CHECK(vis > 0 && vis < MAX_DRONES);                       /* the sample covers both cases */
+}
+
 static void test_tor_gerbera(void) {
   Game g; game_new(&g, 1); g.money = 1000;
   tower_buy(&g, TW_TOR, 5, 5);
@@ -143,6 +181,8 @@ int main(void) {
   RUN(test_engage_range);
   RUN(test_mg_kills_switchblade);
   RUN(test_visibility);
+  RUN(test_range_boundary);
+  RUN(test_engage_cache);
   RUN(test_tor_gerbera);
   RUN(test_patriot_ammo);
   RUN(test_missile_hit_and_stale);

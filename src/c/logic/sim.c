@@ -35,7 +35,7 @@ static void air_strike(Game *g) {
   for (int i = 0; i < MAX_DRONES; i++) {
     const Drone *d = &g->drones[i];
     if (!d->active) continue;
-    if (fx_dist(d->pos.x - g->air_point.x, d->pos.y - g->air_point.y) <= r) kill_drone(g, i);
+    if (fx_within(d->pos.x - g->air_point.x, d->pos.y - g->air_point.y, r)) kill_drone(g, i);
   }
   effect_add(g, FX_AIRSTRIKE, g->air_point, g->air_point, EFFECT_MS);
   g->air_active = 0;

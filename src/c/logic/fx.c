@@ -45,3 +45,10 @@ int32_t fx_dist(int32_t dx, int32_t dy) {
   }
   return (int32_t)res;
 }
+
+bool fx_within(int32_t dx, int32_t dy, int32_t r) {
+  if (r < 0) return false;
+  uint64_t sq = (uint64_t)((int64_t)dx * dx) + (uint64_t)((int64_t)dy * dy);
+  uint64_t lim = (uint64_t)r + 1;
+  return sq < lim * lim;   /* floor(sqrt(sq)) <= r  <=>  sq < (r + 1)^2 */
+}

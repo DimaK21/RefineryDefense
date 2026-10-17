@@ -221,8 +221,10 @@ static void prv_drone(GContext *ctx, const Game *g, const Camera *c, int d) {
 }
 
 void render_entities(GContext *ctx, const Game *g, const Camera *c) {
+  static int32_t s_ranges[MAX_TOWERS];   /* once per frame, not per drone */
+  combat_engage_ranges(g, s_ranges);
   for (int d = 0; d < MAX_DRONES; d++)
-    if (g->drones[d].active && drone_visible(g, d)) prv_drone(ctx, g, c, d);
+    if (g->drones[d].active && drone_visible_in(g, d, s_ranges)) prv_drone(ctx, g, c, d);
   graphics_context_set_fill_color(ctx, COL_MISSILE);
   for (int m = 0; m < MAX_MISSILES; m++)
     if (g->missiles[m].active)

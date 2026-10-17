@@ -31,7 +31,7 @@ bool drone_jammed(const Game *g, int d) {
     const Tower *t = &g->towers[i];
     if (!t->active || t->type != TW_JAMMER) continue;
     Vec c = tower_center(t);
-    if (fx_dist(dr->track.x - c.x, dr->track.y - c.y) <= TOWER_SPECS[TW_JAMMER].range * FX)
+    if (fx_within(dr->track.x - c.x, dr->track.y - c.y, TOWER_SPECS[TW_JAMMER].range * FX))
       return true;
   }
   return false;

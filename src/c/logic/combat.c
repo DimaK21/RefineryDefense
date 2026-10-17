@@ -5,7 +5,7 @@
 static bool is_firing(const TowerSpec *s) { return s->period_ms > 0 && s->damage > 0; }
 
 static bool in_range(Vec a, Vec b, int32_t r) {
-  return fx_dist(a.x - b.x, a.y - b.y) <= r;
+  return fx_within(a.x - b.x, a.y - b.y, r);
 }
 
 bool point_in_radar(const Game *g, Vec p) {
@@ -24,15 +24,26 @@ int32_t tower_engage_range(const Game *g, int t) {
   return units * FX;
 }
 
-bool drone_visible(const Game *g, int d) {
+void combat_engage_ranges(const Game *g, int32_t out[MAX_TOWERS]) {
+  for (int i = 0; i < MAX_TOWERS; i++) {
+    const Tower *t = &g->towers[i];
+    out[i] = t->active && is_firing(&TOWER_SPECS[t->type]) ? tower_engage_range(g, i) : 0;
+  }
+}
+
+bool drone_visible_in(const Game *g, int d, const int32_t ranges[MAX_TOWERS]) {
   Vec p = g->drones[d].pos;
   if (point_in_radar(g, p)) return true;
   for (int i = 0; i < MAX_TOWERS; i++) {
-    const Tower *t = &g->towers[i];
-    if (!t->active || !is_firing(&TOWER_SPECS[t->type])) continue;
-    if (in_range(p, tower_center(t), tower_engage_range(g, i))) return true;
+    if (ranges[i] > 0 && in_range(p, tower_center(&g->towers[i]), ranges[i])) return true;
   }
   return false;
+}
+
+bool drone_visible(const Game *g, int d) {
+  int32_t ranges[MAX_TOWERS];
+  combat_engage_ranges(g, ranges);
+  return drone_visible_in(g, d, ranges);
 }
 
 bool drone_identified(const Game *g, int d) {
@@ -55,10 +66,9 @@ static void damage_drone(Game *g, int d, uint8_t dmg) {
   else dr->hp = (uint8_t)(dr->hp - dmg);
 }
 
-static int pick_target(const Game *g, int ti) {
+static int pick_target(const Game *g, int ti, int32_t range) {
   const Tower *t = &g->towers[ti];
   Vec c = tower_center(t);
-  int32_t range = tower_engage_range(g, ti);
   bool missile = t->type == TW_TOR || t->type == TW_PATRIOT;
   int best = -1; int32_t bd = 0;
   for (int i = 0; i < MAX_DRONES; i++) {
@@ -90,7 +100,7 @@ static void update_missiles(Game *g, uint16_t dt_ms) {
       m->pos.x += (int32_t)((int64_t)dx * step / dist);
       m->pos.y += (int32_t)((int64_t)dy * step / dist);
     }
-    if (fx_dist(d->pos.x - m->pos.x, d->pos.y - m->pos.y) <= HIT_RADIUS * FX) {
+    if (fx_within(d->pos.x - m->pos.x, d->pos.y - m->pos.y, HIT_RADIUS * FX)) {
       m->active = 0;
       damage_drone(g, m->drone_idx, TOWER_SPECS[m->tower_type].damage);
     }
@@ -99,6 +109,8 @@ static void update_missiles(Game *g, uint16_t dt_ms) {
 
 void combat_update(Game *g, uint16_t dt_ms) {
   update_missiles(g, dt_ms);
+  int32_t ranges[MAX_TOWERS];   /* once per tick: towers do not change during combat */
+  combat_engage_ranges(g, ranges);
   for (int i = 0; i < MAX_TOWERS; i++) {
     Tower *t = &g->towers[i];
     const TowerSpec *s = &TOWER_SPECS[t->type];
@@ -108,7 +120,7 @@ void combat_update(Game *g, uint16_t dt_ms) {
     }
     if (t->cooldown_ms > 0) continue;
     if (s->ammo != 0 && t->ammo == 0) continue;
-    int target = pick_target(g, i);
+    int target = pick_target(g, i, ranges[i]);
     if (target < 0) continue;
     Vec c = tower_center(t);
     if (t->type == TW_TOR || t->type == TW_PATRIOT) {
