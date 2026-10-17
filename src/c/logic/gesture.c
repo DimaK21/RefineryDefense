@@ -28,3 +28,15 @@ Gesture gesture_feed(GestureTracker *t, TouchKind k, int16_t x, int16_t y, uint3
   t->down = false; t->panning = false;
   return g;
 }
+
+uint32_t touch_clock_ms(TouchClock *c, uint32_t s, uint16_t ms) {
+  if (!c->started) {
+    c->started = true; c->s = s; c->ms = ms; c->now = 0;
+    return 0;
+  }
+  uint32_t d = (uint32_t)(ms + 1000u - c->ms) % 1000u;
+  int32_t ds = (int32_t)(s - c->s);
+  if (ds >= 3) d += (uint32_t)(ds - 2) * 1000u;
+  c->s = s; c->ms = ms; c->now += d;
+  return c->now;
+}

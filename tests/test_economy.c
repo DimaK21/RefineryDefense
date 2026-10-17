@@ -13,7 +13,9 @@ static void test_day_economy(void) {
   CHECK_EQ(tower_move(&g, t, 2, 2), ACT_OK); CHECK_EQ(tower_at(&g, 2, 2), t); CHECK_EQ(g.money, 120);
   g.towers[t].hp = 1;                                          /* MG: hp 3, cost 30 */
   CHECK_EQ(tower_repair_cost(&g, t), 6);                       /* ceil(9 * 2/3) */
+  CHECK_EQ(tower_sell_value(&g, t), 15); CHECK_EQ(tower_sell_value(&g, MAX_TOWERS), 0);
   CHECK_EQ(tower_sell(&g, t), ACT_OK); CHECK_EQ(g.money, 135); CHECK_EQ(tower_at(&g, 2, 2), -1);
+  CHECK_EQ(tower_sell_value(&g, t), 0);
   g.money = 1000; tower_buy(&g, TW_TOR, 5, 5); int tor = tower_at(&g, 5, 5);
   CHECK_EQ(tower_reload_cost(&g, tor), 0); CHECK_EQ(tower_reload(&g, tor), ACT_INVALID);
   g.towers[tor].ammo = 2; CHECK_EQ(tower_reload_cost(&g, tor), 20);
@@ -25,7 +27,19 @@ static void test_day_economy(void) {
   g.phase = PHASE_NIGHT; CHECK_EQ(tower_buy(&g, TW_MG, 9, 0), ACT_INVALID);
 }
 
+static void test_plant_health(void) {
+  static Game g; game_new(&g, 1);
+  CHECK_EQ(plant_health_pct(&g), 100);                         /* two built, both full */
+  g.objects[OBJ_TANK_A].hp = 40; CHECK_EQ(plant_health_pct(&g), 70);
+  g.objects[OBJ_TANK_A].status = OBJ_DESTROYED; g.objects[OBJ_TANK_A].hp = 0;
+  CHECK_EQ(plant_health_pct(&g), 50);                          /* destroyed counts as 0 */
+  g.objects[OBJ_TANK_A].hp = 70; CHECK_EQ(plant_health_pct(&g), 50);  /* hp ignored unless alive */
+  for (int o = 0; o < OBJ_COUNT; o++) g.objects[o].status = OBJ_NOT_BUILT;
+  CHECK_EQ(plant_health_pct(&g), 0);
+}
+
 int main(void) {
   RUN(test_day_economy);
+  RUN(test_plant_health);
   return TEST_SUMMARY();
 }

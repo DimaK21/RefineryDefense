@@ -76,9 +76,14 @@ ActResult tower_move(Game *g, int idx, int col, int row) {
   return ACT_OK;
 }
 
+int32_t tower_sell_value(const Game *g, int idx) {
+  if (!valid_tower(g, idx)) return 0;
+  return (int32_t)TOWER_SPECS[g->towers[idx].type].cost * SELL_REFUND_PCT / 100;
+}
+
 ActResult tower_sell(Game *g, int idx) {
   if (g->phase != PHASE_DAY || !valid_tower(g, idx)) return ACT_INVALID;
-  g->money += TOWER_SPECS[g->towers[idx].type].cost * SELL_REFUND_PCT / 100;
+  g->money += tower_sell_value(g, idx);
   g->towers[idx].active = 0;
   return ACT_OK;
 }
@@ -148,4 +153,14 @@ int32_t morning_income(const Game *g) {
     if (g->objects[o].status == OBJ_ALIVE)
       sum += (int32_t)OBJECT_SPECS[o].income * g->objects[o].hp / 100;
   return sum;
+}
+
+int plant_health_pct(const Game *g) {
+  int32_t hp = 0, built = 0;
+  for (int o = 0; o < OBJ_COUNT; o++) {
+    if (g->objects[o].status == OBJ_NOT_BUILT) continue;
+    built++;
+    if (g->objects[o].status == OBJ_ALIVE) hp += g->objects[o].hp;
+  }
+  return built ? (int)(hp * 100 / (built * OBJECT_MAX_HP)) : 0;
 }

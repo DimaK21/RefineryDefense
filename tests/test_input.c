@@ -69,7 +69,17 @@ static void test_cell(void) {
   CHECK(!world_to_cell(10, 19 * 12, &col, &row));
 }
 
+static void test_touch_clock(void) {
+  TouchClock c = {0};
+  CHECK_EQ(touch_clock_ms(&c, 100, 506), 0);                   /* first sample is the origin */
+  CHECK_EQ(touch_clock_ms(&c, 99, 607), 101);                  /* seconds lag the ms field */
+  CHECK_EQ(touch_clock_ms(&c, 100, 710), 204);
+  CHECK_EQ(touch_clock_ms(&c, 101, 20), 514);                  /* ms wraps */
+  CHECK_EQ(touch_clock_ms(&c, 105, 20), 2514);                 /* long gap: whole extra seconds */
+}
+
 int main(void) {
+  RUN(test_touch_clock);
   RUN(test_tap); RUN(test_long_hold); RUN(test_pan);
   RUN(test_slop_and_orphans); RUN(test_camera); RUN(test_cell);
   return TEST_SUMMARY();
