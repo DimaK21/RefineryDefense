@@ -95,9 +95,9 @@ static void test_balance(void) {
   printf("bot median (sorted[10]) = %d, min %d, max %d\n", median, sorted[0], sorted[SEEDS - 1]);
   int capped = 0; for (int s = 0; s < SEEDS; s++) capped += smart[s] >= MAX_NIGHTS;
   printf("seeds reaching the %d-night cap: %d\n", MAX_NIGHTS, capped);
-  CHECK(median >= 6);
-  CHECK(median <= 20);
-  CHECK(capped <= 2);
+  CHECK(median >= 7);
+  CHECK(median <= 15);
+  CHECK(capped == 0);
   CHECK(idle_ok);
 }
 

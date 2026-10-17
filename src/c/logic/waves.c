@@ -28,7 +28,18 @@ uint16_t wave_generate(WaveEntry *out, uint16_t max, uint16_t night, int alive_o
     for (int d = 0; d < DR_COUNT; d++)
       if (DRONE_SPECS[d].first_night <= night && DRONE_SPECS[d].threat <= rem) ok[nok++] = (uint8_t)d;
     if (nok == 0) break;
-    uint8_t type = ok[rng_range(&rng, 0, nok - 1)];
+    /* Large budgets would be lost to the slot limit: keep only types at least WAVE_HEAVY_PCT of the
+     * per-slot budget; if none qualifies, the whole affordable pool stays. */
+    int32_t want = rem * WAVE_HEAVY_PCT / (int32_t)(max - n);
+    uint8_t heavy[DR_COUNT]; int nh = 0;
+    for (int i = 0; i < nok; i++)
+      if ((int32_t)DRONE_SPECS[ok[i]].threat * 100 >= want) heavy[nh++] = ok[i];
+    if (nh == 0) {                                 /* nobody is heavy enough: take the heaviest */
+      int best = 0;
+      for (int i = 1; i < nok; i++) if (DRONE_SPECS[ok[i]].threat > DRONE_SPECS[ok[best]].threat) best = i;
+      heavy[nh++] = ok[best];
+    }
+    uint8_t type = heavy[rng_range(&rng, 0, nh - 1)];
     uint8_t side = sides[rng_range(&rng, 0, ns - 1)];
     uint32_t t = (uint32_t)rng_range(&rng, 0, SPAWN_WINDOW_MS - 1);
     int count = type == DR_SWITCHBLADE ? rng_range(&rng, SWARM_MIN, SWARM_MAX) : 1;
