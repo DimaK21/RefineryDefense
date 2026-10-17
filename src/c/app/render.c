@@ -9,6 +9,8 @@
 #define DASH_PX 3
 #define EXPLOSION_UNITS 5
 #define MISSILE_UNITS 1
+#define TRAIL_UNITS 6
+#define AIRSTRIKE_MIN_UNITS 3
 
 static const char OBJECT_LETTERS[OBJ_COUNT] = {'D', 'A', 'B', 'L', 'C'};
 
@@ -194,10 +196,21 @@ static void prv_drone(GContext *ctx, const Game *g, const Camera *c, int d) {
   if (type == DR_GERBERA && !drone_identified(g, d)) type = DR_SHAHED136;
   GPoint p = prv_vec(c, dr->pos);
   int r = (type == DR_SWITCHBLADE ? 1 : 2) * c->zoom;
+  if (c->zoom == 1) r++;   /* night x1: a 1 px radius is a speck */
   if (type == DR_GERBERA) {
     graphics_context_set_stroke_color(ctx, COL_DECOY);
     graphics_draw_circle(ctx, p, r);
     return;
+  }
+  /* Trail: a short segment behind the drone, opposite to its heading on the track. */
+  Vec w = dr->wps[dr->wp_idx];
+  int32_t dx = w.x - dr->track.x, dy = w.y - dr->track.y;
+  int32_t len = fx_dist(dx, dy);
+  if (len > 0) {
+    GPoint t = GPoint(p.x - (int)(dx * TRAIL_UNITS * c->zoom / len),
+                      p.y - (int)(dy * TRAIL_UNITS * c->zoom / len));
+    graphics_context_set_stroke_color(ctx, COL_DRONE_TRAIL);
+    graphics_draw_line(ctx, p, t);
   }
   graphics_context_set_fill_color(ctx, COL_DRONE);
   graphics_fill_circle(ctx, p, r);
@@ -222,10 +235,15 @@ void render_entities(GContext *ctx, const Game *g, const Camera *c) {
         graphics_context_set_stroke_color(ctx, COL_MISSILE);
         graphics_draw_line(ctx, prv_vec(c, ef->a), prv_vec(c, ef->b));
         break;
-      case FX_AIRSTRIKE:
+      case FX_AIRSTRIKE: {   /* ring expanding to AIR_RADIUS over the effect's lifetime */
+        int ttl = ef->ttl_ms < 0 ? 0 : ef->ttl_ms;
+        int rad = AIRSTRIKE_MIN_UNITS + (AIR_RADIUS - AIRSTRIKE_MIN_UNITS) * (EFFECT_MS - ttl) / EFFECT_MS;
         graphics_context_set_stroke_color(ctx, COL_EXPLOSION);
-        graphics_draw_circle(ctx, prv_vec(c, ef->a), AIR_RADIUS * c->zoom);
+        graphics_context_set_stroke_width(ctx, 3);
+        graphics_draw_circle(ctx, prv_vec(c, ef->a), rad * c->zoom);
+        graphics_context_set_stroke_width(ctx, 1);
         break;
+      }
       default:   /* FX_EXPLOSION */
         graphics_context_set_fill_color(ctx, COL_EXPLOSION);
         graphics_fill_circle(ctx, prv_vec(c, ef->a), EXPLOSION_UNITS * c->zoom);
