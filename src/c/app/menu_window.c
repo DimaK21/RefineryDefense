@@ -34,7 +34,12 @@ static void prv_select(MenuLayer *m, MenuIndex *idx, void *data) {
   Game *g = app_game();
   if (row == 0) {
     bool pending = false;
-    if (!storage_load(g, &pending)) { prv_refresh(); menu_layer_reload_data(s_menu); return; }
+    if (!storage_load(g, &pending)) {   /* corrupt save: drop it so Continue disappears */
+      storage_clear();
+      prv_refresh();
+      menu_layer_reload_data(s_menu);
+      return;
+    }
     if (pending) {
       night_begin(g);
       app_go_night();
