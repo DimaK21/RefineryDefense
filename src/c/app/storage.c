@@ -1,36 +1,39 @@
 #include "storage.h"
 
-#define KEY_HDR 1
-#define KEY_TOWERS 2
+#define KEY_OLD_HDR 1      /* pre-single-key layout: deleted on save */
+#define KEY_OLD_TOWERS 2
 #define KEY_BEST 3
+#define KEY_SAVE 4         /* header + towers in one key: written atomically */
+
+_Static_assert(SAVE_LEN <= PERSIST_DATA_MAX_LENGTH, "save must fit one persist key");
 
 void storage_save(const Game *g, bool pending_night) {
-  uint8_t hdr[SAVE_HDR_LEN];
-  uint8_t tw[SAVE_TOWERS_LEN];
-  if (!save_write_header(g, pending_night, hdr, sizeof(hdr))) return;
-  if (!save_write_towers(g, tw, sizeof(tw))) return;
-  persist_write_data(KEY_HDR, hdr, sizeof(hdr));
-  persist_write_data(KEY_TOWERS, tw, sizeof(tw));
+  uint8_t buf[SAVE_LEN];
+  if (!save_write(g, pending_night, buf, sizeof(buf))) return;
+  int written = persist_write_data(KEY_SAVE, buf, sizeof(buf));
+  if (written != (int)sizeof(buf)) {
+    APP_LOG(APP_LOG_LEVEL_ERROR, "save write failed: %d", written);
+    return;
+  }
+  if (persist_exists(KEY_OLD_HDR)) persist_delete(KEY_OLD_HDR);
+  if (persist_exists(KEY_OLD_TOWERS)) persist_delete(KEY_OLD_TOWERS);
 }
 
 bool storage_exists(void) {
-  return persist_exists(KEY_HDR) && persist_exists(KEY_TOWERS) &&
-         persist_get_size(KEY_HDR) == SAVE_HDR_LEN &&
-         persist_get_size(KEY_TOWERS) == SAVE_TOWERS_LEN;
+  return persist_get_size(KEY_SAVE) == SAVE_LEN;
 }
 
 bool storage_load(Game *g, bool *pending_night) {
   if (!storage_exists()) return false;
-  uint8_t hdr[SAVE_HDR_LEN];
-  uint8_t tw[SAVE_TOWERS_LEN];
-  if (persist_read_data(KEY_HDR, hdr, sizeof(hdr)) != SAVE_HDR_LEN) return false;
-  if (persist_read_data(KEY_TOWERS, tw, sizeof(tw)) != SAVE_TOWERS_LEN) return false;
-  return save_read(g, pending_night, hdr, sizeof(hdr), tw, sizeof(tw));
+  uint8_t buf[SAVE_LEN];
+  if (persist_read_data(KEY_SAVE, buf, sizeof(buf)) != SAVE_LEN) return false;
+  return save_read_blob(g, pending_night, buf, sizeof(buf));
 }
 
 void storage_clear(void) {
-  persist_delete(KEY_HDR);
-  persist_delete(KEY_TOWERS);
+  persist_delete(KEY_SAVE);
+  if (persist_exists(KEY_OLD_HDR)) persist_delete(KEY_OLD_HDR);
+  if (persist_exists(KEY_OLD_TOWERS)) persist_delete(KEY_OLD_TOWERS);
 }
 
 Best storage_best(void) {
@@ -41,4 +44,7 @@ Best storage_best(void) {
   return b;
 }
 
-void storage_set_best(Best b) { persist_write_data(KEY_BEST, &b, sizeof(b)); }
+void storage_set_best(Best b) {
+  int written = persist_write_data(KEY_BEST, &b, sizeof(b));
+  if (written != (int)sizeof(b)) APP_LOG(APP_LOG_LEVEL_ERROR, "best write failed: %d", written);
+}

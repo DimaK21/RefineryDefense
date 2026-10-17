@@ -61,6 +61,45 @@ static void test_roundtrip(void) {
   CHECK(save_read(&b, NULL, h, sizeof h, t, sizeof t));
 }
 
+static void test_blob(void) {
+  CHECK_EQ(SAVE_LEN, SAVE_HDR_LEN + SAVE_TOWERS_LEN);
+  CHECK(SAVE_LEN <= 256);
+  static Game a, b;
+  setup(&a);
+  uint8_t buf[SAVE_LEN + 4];
+  CHECK_EQ(save_write(&a, true, buf, SAVE_LEN - 1), 0);    /* too small */
+  CHECK_EQ(save_write(&a, true, buf, sizeof buf), SAVE_LEN);
+  uint8_t h[SAVE_HDR_LEN], t[SAVE_TOWERS_LEN];               /* layout: header then towers */
+  save_write_header(&a, true, h, sizeof h);
+  save_write_towers(&a, t, sizeof t);
+  CHECK(memcmp(buf, h, SAVE_HDR_LEN) == 0);
+  CHECK(memcmp(buf + SAVE_HDR_LEN, t, SAVE_TOWERS_LEN) == 0);
+  memset(&b, 0xAA, sizeof b);
+  bool pending = false;
+  CHECK(save_read_blob(&b, &pending, buf, SAVE_LEN));
+  CHECK(pending);
+  CHECK(b.phase == PHASE_DAY);
+  CHECK_EQ(b.night, 5); CHECK_EQ(b.money, -17); CHECK_EQ(b.score, 4321);
+  CHECK_EQ(b.seed, a.seed); CHECK_EQ(b.rng, a.rng);
+  for (int i = 0; i < OBJ_COUNT; i++) {
+    CHECK_EQ(b.objects[i].status, a.objects[i].status);
+    CHECK_EQ(b.objects[i].hp, a.objects[i].hp);
+  }
+  for (int i = 0; i < MAX_TOWERS; i++) {
+    CHECK_EQ(b.towers[i].active, a.towers[i].active);
+    if (!a.towers[i].active) continue;
+    CHECK_EQ(b.towers[i].type, a.towers[i].type);
+    CHECK_EQ(b.towers[i].col, a.towers[i].col);
+    CHECK_EQ(b.towers[i].row, a.towers[i].row);
+    CHECK_EQ(b.towers[i].hp, a.towers[i].hp);
+    CHECK_EQ(b.towers[i].ammo, a.towers[i].ammo);
+  }
+  CHECK(!save_read_blob(&b, &pending, buf, SAVE_LEN - 1));  /* wrong length */
+  CHECK(!save_read_blob(&b, &pending, NULL, SAVE_LEN));
+  buf[0] = SAVE_VERSION + 1;
+  CHECK(!save_read_blob(&b, &pending, buf, SAVE_LEN));      /* validation still applies */
+}
+
 static void test_wave_identical(void) {
   Game a, b; memset(&b, 0, sizeof b); game_new(&a, 11);
   a.night = 3; a.objects[OBJ_TERMINAL].status = OBJ_ALIVE; a.objects[OBJ_TERMINAL].hp = 100;
@@ -126,7 +165,7 @@ static void test_best(void) {
 }
 
 int main(void) {
-  RUN(test_sizes); RUN(test_roundtrip); RUN(test_wave_identical);
+  RUN(test_sizes); RUN(test_roundtrip); RUN(test_blob); RUN(test_wave_identical);
   RUN(test_rejects); RUN(test_best);
   return TEST_SUMMARY();
 }

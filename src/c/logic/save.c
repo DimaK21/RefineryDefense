@@ -86,6 +86,18 @@ bool save_read(Game *g, bool *pending_night, const uint8_t *hdr, size_t hdr_len,
   return true;
 }
 
+size_t save_write(const Game *g, bool pending_night, uint8_t *buf, size_t cap) {
+  if (cap < SAVE_LEN) return 0;
+  if (!save_write_header(g, pending_night, buf, SAVE_HDR_LEN)) return 0;
+  if (!save_write_towers(g, buf + SAVE_HDR_LEN, SAVE_TOWERS_LEN)) return 0;
+  return SAVE_LEN;
+}
+
+bool save_read_blob(Game *g, bool *pending_night, const uint8_t *buf, size_t len) {
+  if (!buf || len != SAVE_LEN) return false;
+  return save_read(g, pending_night, buf, SAVE_HDR_LEN, buf + SAVE_HDR_LEN, SAVE_TOWERS_LEN);
+}
+
 bool best_update(Best *b, uint16_t nights, uint32_t score) {
   if (nights > b->nights || (nights == b->nights && score > b->score)) {
     b->nights = nights; b->score = score;
