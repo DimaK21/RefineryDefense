@@ -191,7 +191,6 @@ static void prv_start_night(void) {
 }
 
 static void prv_tap_bar(int16_t x) {
-  s_move = false;
   int slot = x / SLOT_W;
   if (slot < TW_COUNT) s_sel = (TowerType)slot;
   else prv_start_night();
@@ -236,9 +235,10 @@ static void prv_tap(int16_t x, int16_t y) {
     }
     return;
   }
+  bool on_map = grect_contains_point(&map, &p) && !grect_contains_point(&mini, &p);
+  if (s_move && !on_map) { s_move = false; return; }   /* bar hint, minimap, HUD: cancel */
   if (grect_contains_point(&bar, &p)) { prv_tap_bar(x); return; }
-  if (grect_contains_point(&mini, &p)) return;
-  if (!grect_contains_point(&map, &p)) return;   /* HUD */
+  if (!on_map) return;   /* minimap, HUD */
   int16_t wx, wy;
   int col, row;
   camera_to_world(&s_cam, x - map.origin.x, y - map.origin.y, &wx, &wy);
