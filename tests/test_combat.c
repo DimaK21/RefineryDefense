@@ -185,7 +185,50 @@ static void test_pool_full(void) {
   CHECK_EQ(g.towers[0].cooldown_ms, 0);
 }
 
+static void test_flare_detects(void) {
+  Game g; game_new(&g, 1); g.money = 1000;
+  tower_buy(&g, TW_MG, 8, 7);                               /* center (102,90), no radar */
+  CHECK_EQ(tower_engage_range(&g, 0), 22 * DETECT_PCT / 100 * FX);
+  put_drone(&g, 0, DR_GERBERA, at(140, 90), at(140, 200), 1);
+  CHECK(!drone_visible(&g, 0));
+  g.flare_point = at(120, 90); g.flare_ms = 1000;
+  CHECK(drone_visible(&g, 0));                              /* lit by the flare */
+  CHECK(drone_identified(&g, 0));
+  CHECK_EQ(tower_engage_range(&g, 0), 22 * FX);             /* tower inside the flare: full range */
+  g.flare_ms = 0;
+  CHECK(!drone_visible(&g, 0));
+}
+
+static void test_combo(void) {
+  Game g; game_new(&g, 1);
+  CHECK_EQ(combo_pct(1), 100); CHECK_EQ(combo_pct(COMBO_X15_AT), 150); CHECK_EQ(combo_pct(COMBO_X2_AT), 200);
+  int32_t paid = 0;
+  for (int k = 0; k < 7; k++) {                             /* 7 Harpies ($10) in a row */
+    put_drone(&g, k, DR_HARPY, at(50, 50), at(50, 200), (uint16_t)(k + 1));
+    kill_drone(&g, k);
+    paid += 10 * combo_pct((uint16_t)(k + 1)) / 100;
+  }
+  CHECK_EQ(paid, 10 + 10 + 15 + 15 + 15 + 20 + 20);
+  CHECK_EQ(g.money, START_MONEY + paid);
+  CHECK_EQ(g.stats.bounty, paid);
+  CHECK_EQ(g.score, (uint32_t)paid);
+  CHECK_EQ(g.combo, 7);
+  CHECK_EQ(g.stats.best_combo, 7);
+  int last = -1;
+  for (int i = 0; i < MAX_EFFECTS; i++)
+    if (g.effects[i].active && g.effects[i].kind == FX_BOUNTY) last = g.effects[i].value;
+  CHECK_EQ(last, 20);                                       /* popup shows the multiplied bounty */
+  g.combo_ms = 0;                                           /* window expired */
+  put_drone(&g, 0, DR_HARPY, at(50, 50), at(50, 200), 99);
+  kill_drone(&g, 0);
+  CHECK_EQ(g.combo, 1);
+  CHECK_EQ(g.stats.best_combo, 7);
+  CHECK_EQ(g.combo_ms, COMBO_WINDOW_MS);
+}
+
 int main(void) {
+  RUN(test_flare_detects);
+  RUN(test_combo);
   RUN(test_engage_range);
   RUN(test_mg_kills_switchblade);
   RUN(test_visibility);

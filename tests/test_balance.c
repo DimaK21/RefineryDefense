@@ -3,10 +3,14 @@
 #include "config.h"
 #include "economy.h"
 #include "sim.h"
+#include "combat.h"
+#include "fx.h"
 
 #define SEEDS 20
 #define MAX_NIGHTS 60
 #define TICKS_CAP 5000
+#define BOT_REACT_TICKS 10   /* the night bot looks at the sky every 400 ms, like a player */
+#define BOT_CLUSTER 3        /* fire an ability at this many visible drones or more */
 
 static int cmp_int(const void *a, const void *b) { return *(const int *)a - *(const int *)b; }
 
@@ -64,6 +68,26 @@ static void bot_morning(Game *g) {
   }
 }
 
+/* Night: Air Strike, then EW Pulse at the densest cluster of visible drones. */
+static void bot_night(Game *g) {
+  static const Ability use[2] = {AB_AIR, AB_EW};
+  for (int u = 0; u < 2; u++) {
+    Ability a = use[u];
+    if (!ability_ready(g, a)) continue;
+    int32_t r = ABILITY_SPECS[a].radius * FX;
+    int best = -1, best_n = 0;
+    for (int i = 0; i < MAX_DRONES; i++) {
+      if (!g->drones[i].active || !drone_visible(g, i)) continue;
+      int n = 0;
+      for (int j = 0; j < MAX_DRONES; j++)
+        if (g->drones[j].active && drone_visible(g, j) &&
+            fx_within(g->drones[j].pos.x - g->drones[i].pos.x, g->drones[j].pos.y - g->drones[i].pos.y, r)) n++;
+      if (n > best_n) { best_n = n; best = i; }
+    }
+    if (best >= 0 && best_n >= BOT_CLUSTER) ability_use(g, a, g->drones[best].pos);
+  }
+}
+
 /* Returns nights survived (capped at MAX_NIGHTS); *lost_night = g.night at game over, 0 if none. */
 static int run(uint32_t seed, int smart, int *lost_night) {
   Game g; game_new(&g, seed);
@@ -71,7 +95,10 @@ static int run(uint32_t seed, int smart, int *lost_night) {
   while (g.night <= MAX_NIGHTS) {
     if (smart) bot_morning(&g);
     night_begin(&g);
-    for (int i = 0; i < TICKS_CAP && g.phase == PHASE_NIGHT; i++) sim_tick(&g, 40);
+    for (int i = 0; i < TICKS_CAP && g.phase == PHASE_NIGHT; i++) {
+      if (smart && i % BOT_REACT_TICKS == 0) bot_night(&g);
+      sim_tick(&g, 40);
+    }
     CHECK(g.phase != PHASE_NIGHT);                 /* a night must end within the tick cap */
     if (g.phase == PHASE_GAME_OVER) { *lost_night = g.night; return nights_survived(&g); }
     if (g.phase != PHASE_REPORT) break;

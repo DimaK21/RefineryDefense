@@ -11,15 +11,19 @@
 #include "../logic/fx.h"
 #include "../logic/gesture.h"
 #include "../logic/camera.h"
+#include "../logic/combat.h"
 
 #define TICK_MS 40
 #define MAX_CATCHUP_MS 200   /* real ms simulated per callback at most: a stall must not teleport drones */
 #define HUD_H 14
-#define MARK_CONFIRM_PX 20   /* UI tuning: a tap this close to the marker confirms Air Support */
+#define MARK_CONFIRM_PX 20   /* UI tuning: a tap this close to the marker uses the ability */
 #define MARK_TTL_MS 3000     /* UI tuning: the marker disappears this long after its last placement */
 #define BANNER_MS 2500       /* "NIGHT N" banner and raid arrows at the start of the night (sim time) */
 #define BLIP_INSET 4         /* spawn blips sit this far inside the screen edge */
 #define BLIP_BLINK_MS 150
+#define ZONE_BLINK_MS 1000   /* an EW / Flare zone blinks during its last second */
+#define AB_ICON_X 148        /* HUD: selected ability icon centre */
+#define AB_DOTS_X 138        /* HUD: column of three dots, the selected ability lit */
 
 static Window *s_window;
 static Layer *s_layer;
@@ -29,6 +33,7 @@ static GestureTracker s_gt;
 static TouchClock s_clock;
 static uint32_t s_last_ms;
 static bool s_fast, s_paused;
+static Ability s_ability;
 static bool s_mark;
 static GPoint s_mark_pt;
 static uint32_t s_mark_ms;
@@ -40,9 +45,6 @@ static uint32_t prv_now_ms(void) {
   return touch_clock_ms(&s_clock, (uint32_t)s, ms);
 }
 
-static bool prv_air_available(const Game *g) {
-  return !g->air_used && g->money >= AIR_COST;
-}
 
 /* ---- drawing ---- */
 
@@ -52,12 +54,48 @@ static void prv_text(GContext *ctx, const char *txt, GRect r, GTextAlignment ali
                      GTextOverflowModeTrailingEllipsis, align, NULL);
 }
 
-static void prv_air_icon(GContext *ctx, GPoint c, GColor col) {
+/* Plane for Air Strike, lightning for EW Pulse, star for Flare. */
+static void prv_ability_icon(GContext *ctx, Ability a, GPoint c, GColor col) {
   graphics_context_set_stroke_color(ctx, col);
-  graphics_draw_line(ctx, GPoint(c.x, c.y - 5), GPoint(c.x, c.y + 4));           /* fuselage */
-  graphics_draw_line(ctx, GPoint(c.x - 5, c.y), GPoint(c.x + 5, c.y));           /* wings */
-  graphics_draw_line(ctx, GPoint(c.x - 4, c.y + 1), GPoint(c.x + 4, c.y + 1));
-  graphics_draw_line(ctx, GPoint(c.x - 2, c.y + 4), GPoint(c.x + 2, c.y + 4));   /* tail */
+  switch (a) {
+    case AB_AIR:
+      graphics_draw_line(ctx, GPoint(c.x, c.y - 5), GPoint(c.x, c.y + 4));           /* fuselage */
+      graphics_draw_line(ctx, GPoint(c.x - 5, c.y), GPoint(c.x + 5, c.y));           /* wings */
+      graphics_draw_line(ctx, GPoint(c.x - 4, c.y + 1), GPoint(c.x + 4, c.y + 1));
+      graphics_draw_line(ctx, GPoint(c.x - 2, c.y + 4), GPoint(c.x + 2, c.y + 4));   /* tail */
+      break;
+    case AB_EW:
+      for (int dx = 0; dx < 2; dx++) {   /* two px thick zigzag */
+        graphics_draw_line(ctx, GPoint(c.x + 2 + dx, c.y - 5), GPoint(c.x - 2 + dx, c.y));
+        graphics_draw_line(ctx, GPoint(c.x - 2 + dx, c.y), GPoint(c.x + 2 + dx, c.y));
+        graphics_draw_line(ctx, GPoint(c.x + 2 + dx, c.y), GPoint(c.x - 2 + dx, c.y + 5));
+      }
+      break;
+    default:   /* AB_FLARE */
+      graphics_draw_line(ctx, GPoint(c.x, c.y - 5), GPoint(c.x, c.y + 5));
+      graphics_draw_line(ctx, GPoint(c.x - 5, c.y), GPoint(c.x + 5, c.y));
+      graphics_draw_line(ctx, GPoint(c.x - 3, c.y - 3), GPoint(c.x + 3, c.y + 3));
+      graphics_draw_line(ctx, GPoint(c.x - 3, c.y + 3), GPoint(c.x + 3, c.y - 3));
+      break;
+  }
+}
+
+/* Selected ability: icon (yellow ready, gray unaffordable) or seconds left on its cooldown, and
+ * three dots showing which of the three it is. */
+static void prv_draw_ability(GContext *ctx, const Game *g) {
+  uint16_t cd = g->ab_cooldown_ms[s_ability];
+  if (cd > 0) {
+    char buf[4];
+    snprintf(buf, sizeof(buf), "%u", (unsigned)((cd + 999) / 1000));
+    prv_text(ctx, buf, GRect(AB_ICON_X - 10, -3, 20, HUD_H + 4), GTextAlignmentCenter, COL_DISABLED);
+  } else {
+    prv_ability_icon(ctx, s_ability, GPoint(AB_ICON_X, HUD_H / 2),
+                     ability_ready(g, s_ability) ? COL_SELECT : COL_DISABLED);
+  }
+  for (int a = 0; a < AB_COUNT; a++) {
+    graphics_context_set_fill_color(ctx, a == (int)s_ability ? COL_HUD_TEXT : COL_DISABLED);
+    graphics_fill_rect(ctx, GRect(AB_DOTS_X, 2 + 4 * a, 2, 2), 0, GCornerNone);
+  }
 }
 
 static void prv_draw_hud(GContext *ctx, const Game *g, int w) {
@@ -70,17 +108,50 @@ static void prv_draw_hud(GContext *ctx, const Game *g, int w) {
   snprintf(buf, sizeof(buf), "NIGHT %u", (unsigned)g->night);
   prv_text(ctx, buf, GRect(52, -3, 70, HUD_H + 4), GTextAlignmentCenter, COL_HUD_TEXT);
   if (s_fast) prv_text(ctx, "x2", GRect(122, -3, 18, HUD_H + 4), GTextAlignmentLeft, COL_SELECT);
-  prv_air_icon(ctx, GPoint(148, HUD_H / 2), prv_air_available(g) ? COL_SELECT : COL_DISABLED);
+  prv_draw_ability(ctx, g);
   int hp = plant_health_pct(g);
   snprintf(buf, sizeof(buf), "%d%%", hp);
   prv_text(ctx, buf, GRect(w - 48, -3, 45, HUD_H + 4), GTextAlignmentRight, health_color(hp));
 }
 
-static void prv_draw_mark(GContext *ctx, GPoint p, GColor col) {
+static void prv_draw_mark(GContext *ctx, GPoint p, int radius, GColor col) {
   graphics_context_set_stroke_color(ctx, col);
-  graphics_draw_circle(ctx, p, AIR_RADIUS);
+  graphics_draw_circle(ctx, p, radius);
   graphics_draw_line(ctx, GPoint(p.x - 3, p.y), GPoint(p.x + 3, p.y));
   graphics_draw_line(ctx, GPoint(p.x, p.y - 3), GPoint(p.x, p.y + 3));
+}
+
+static GPoint prv_pt(Vec v) { return GPoint(v.x / FX, v.y / FX); }
+
+static bool prv_zone_shown(int16_t ms_left) {
+  return ms_left > ZONE_BLINK_MS || (ms_left / BLIP_BLINK_MS) % 2 == 0;
+}
+
+/* Active EW Pulse (violet double ring) and Flare (pale yellow ring, white star in the middle). */
+static void prv_draw_zones(GContext *ctx, const Game *g) {
+  if (g->ew_ms > 0 && prv_zone_shown(g->ew_ms)) {
+    GPoint p = prv_pt(g->ew_point);
+    graphics_context_set_stroke_color(ctx, COL_EW_ZONE);
+    graphics_draw_circle(ctx, p, ABILITY_SPECS[AB_EW].radius);
+    graphics_draw_circle(ctx, p, ABILITY_SPECS[AB_EW].radius - 2);
+  }
+  if (g->flare_ms > 0 && prv_zone_shown(g->flare_ms)) {
+    GPoint p = prv_pt(g->flare_point);
+    graphics_context_set_stroke_color(ctx, COL_FLARE_ZONE);
+    graphics_draw_circle(ctx, p, ABILITY_SPECS[AB_FLARE].radius);
+    prv_ability_icon(ctx, AB_FLARE, p, GColorWhite);
+  }
+}
+
+/* Kill streak under the HUD while it pays a multiplier. */
+static void prv_draw_combo(GContext *ctx, const Game *g, int w) {
+  if (g->combo < COMBO_X15_AT || g->combo_ms == 0) return;
+  int pct = combo_pct(g->combo);
+  char buf[24];
+  snprintf(buf, sizeof(buf), "COMBO %u  x%s", (unsigned)g->combo, pct >= 200 ? "2" : "1.5");
+  GRect r = GRect(0, HUD_H - 2, w, 18);
+  prv_text(ctx, buf, GRect(r.origin.x + 1, r.origin.y + 1, r.size.w, r.size.h), GTextAlignmentCenter, GColorBlack);
+  prv_text(ctx, buf, r, GTextAlignmentCenter, pct >= 200 ? GColorOrange : COL_SELECT);
 }
 
 /* A drone has just crossed the map edge: pulsing red blip there, so a raid that is still out of
@@ -140,10 +211,14 @@ static void prv_update(Layer *layer, GContext *ctx) {
   GRect b = layer_get_bounds(layer);
   render_map(ctx, g, &s_cam, true);
   render_towers(ctx, g, &s_cam, false);
+  prv_draw_zones(ctx, g);
   render_entities(ctx, g, &s_cam);
-  if (g->air_active) prv_draw_mark(ctx, GPoint(g->air_point.x / FX, g->air_point.y / FX), COL_EXPLOSION);
-  else if (s_mark && prv_air_available(g)) prv_draw_mark(ctx, s_mark_pt, COL_AIR_MARK);
+  if (g->air_active) prv_draw_mark(ctx, prv_pt(g->air_point), ABILITY_SPECS[AB_AIR].radius, COL_EXPLOSION);
+  if (s_mark)
+    prv_draw_mark(ctx, s_mark_pt, ABILITY_SPECS[s_ability].radius,
+                  ability_ready(g, s_ability) ? COL_AIR_MARK : COL_DISABLED);
   prv_draw_spawn_blips(ctx, g, b);
+  prv_draw_combo(ctx, g, b.size.w);
   if (g->night_ms < BANNER_MS) prv_draw_banner(ctx, g, b);
   prv_draw_hud(ctx, g, b.size.w);
   if (s_paused) prv_draw_pause(ctx, b);
@@ -214,11 +289,11 @@ static void prv_focus(bool in_focus) {
 
 static void prv_tap(int16_t x, int16_t y) {
   Game *g = app_game();
-  if (s_paused || g->phase != PHASE_NIGHT || !prv_air_available(g)) return;
+  if (s_paused || g->phase != PHASE_NIGHT) return;
   if (s_mark && fx_dist(x - s_mark_pt.x, y - s_mark_pt.y) <= MARK_CONFIRM_PX) {
     Vec p = {s_mark_pt.x * FX, s_mark_pt.y * FX};
-    air_support_call(g, p);
-    s_mark = false;
+    if (ability_use(g, s_ability, p)) s_mark = false;
+    else feedback_short();   /* on cooldown or no money: the mark stays, nothing is spent */
   } else {
     s_mark = true;
     s_mark_pt = GPoint(x, y);
@@ -240,6 +315,15 @@ static void prv_select(ClickRecognizerRef r, void *ctx) {
   layer_mark_dirty(s_layer);
 }
 
+static void prv_cycle(int step) {
+  if (s_paused) return;
+  s_ability = (Ability)((s_ability + AB_COUNT + step) % AB_COUNT);
+  layer_mark_dirty(s_layer);
+}
+
+static void prv_up(ClickRecognizerRef r, void *ctx) { prv_cycle(-1); }
+static void prv_down(ClickRecognizerRef r, void *ctx) { prv_cycle(1); }
+
 static void prv_back(ClickRecognizerRef r, void *ctx) {
   if (s_paused) { app_go_menu(); return; }   /* the pending_night save from day start stays */
   prv_set_paused(true);
@@ -248,6 +332,8 @@ static void prv_back(ClickRecognizerRef r, void *ctx) {
 static void prv_clicks(void *ctx) {
   window_single_click_subscribe(BUTTON_ID_SELECT, prv_select);
   window_single_click_subscribe(BUTTON_ID_BACK, prv_back);
+  window_single_click_subscribe(BUTTON_ID_UP, prv_up);
+  window_single_click_subscribe(BUTTON_ID_DOWN, prv_down);
 }
 
 /* ---- window ---- */
@@ -260,6 +346,7 @@ static void prv_load(Window *w) {
   s_fast = false;
   s_paused = false;
   s_mark = false;
+  s_ability = AB_AIR;
   s_clock = (TouchClock){0};
   s_last_ms = prv_now_ms();
   prv_schedule();

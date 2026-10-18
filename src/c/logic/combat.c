@@ -8,7 +8,8 @@ static bool in_range(Vec a, Vec b, int32_t r) {
   return fx_within(a.x - b.x, a.y - b.y, r);
 }
 
-bool point_in_radar(const Game *g, Vec p) {
+bool point_detected(const Game *g, Vec p) {
+  if (g->flare_ms > 0 && in_range(p, g->flare_point, ABILITY_SPECS[AB_FLARE].radius * FX)) return true;
   for (int i = 0; i < MAX_TOWERS; i++) {
     const Tower *t = &g->towers[i];
     if (!t->active || t->type != TW_RADAR) continue;
@@ -20,7 +21,7 @@ bool point_in_radar(const Game *g, Vec p) {
 int32_t tower_engage_range(const Game *g, int t) {
   const Tower *tw = &g->towers[t];
   int32_t units = TOWER_SPECS[tw->type].range;
-  if (!point_in_radar(g, tower_center(tw))) units = units * DETECT_PCT / 100;
+  if (!point_detected(g, tower_center(tw))) units = units * DETECT_PCT / 100;
   return units * FX;
 }
 
@@ -33,7 +34,7 @@ void combat_engage_ranges(const Game *g, int32_t out[MAX_TOWERS]) {
 
 bool drone_visible_in(const Game *g, int d, const int32_t ranges[MAX_TOWERS]) {
   Vec p = g->drones[d].pos;
-  if (point_in_radar(g, p)) return true;
+  if (point_detected(g, p)) return true;
   for (int i = 0; i < MAX_TOWERS; i++) {
     if (ranges[i] > 0 && in_range(p, tower_center(&g->towers[i]), ranges[i])) return true;
   }
@@ -47,12 +48,20 @@ bool drone_visible(const Game *g, int d) {
 }
 
 bool drone_identified(const Game *g, int d) {
-  return point_in_radar(g, g->drones[d].pos);
+  return point_detected(g, g->drones[d].pos);
+}
+
+int combo_pct(uint16_t combo) {
+  return combo >= COMBO_X2_AT ? 200 : combo >= COMBO_X15_AT ? 150 : 100;
 }
 
 void kill_drone(Game *g, int d) {
   Drone *dr = &g->drones[d];
-  int32_t bounty = DRONE_SPECS[dr->type].bounty;
+  if (g->combo_ms == 0) g->combo = 0;   /* streak window over (combat without sim_tick, e.g. tests) */
+  if (g->combo < UINT16_MAX) g->combo++;
+  g->combo_ms = COMBO_WINDOW_MS;
+  if (g->combo > g->stats.best_combo) g->stats.best_combo = g->combo;
+  int32_t bounty = DRONE_SPECS[dr->type].bounty * combo_pct(g->combo) / 100;
   g->money += bounty; g->score += (uint32_t)bounty;
   g->stats.kills++; g->stats.bounty += bounty;
   g->events |= EV_EXPLOSION;

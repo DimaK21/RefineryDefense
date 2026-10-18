@@ -11,12 +11,18 @@ typedef struct {
 } DroneSpec;
 
 typedef struct {
+  const char *name; uint16_t cost, cooldown_ms; uint8_t radius;
+  uint16_t duration_ms;   /* Air Strike: delay before it lands; EW Pulse, Flare: how long the zone lasts */
+} AbilitySpec;
+
+typedef struct {
   const char *name; uint8_t income; uint16_t build_cost; uint8_t col, row;  /* occupies 2x2 cells */
 } ObjectSpec;
 
 extern const TowerSpec TOWER_SPECS[TW_COUNT];
 extern const DroneSpec DRONE_SPECS[DR_COUNT];
 extern const ObjectSpec OBJECT_SPECS[OBJ_COUNT];
+extern const AbilitySpec ABILITY_SPECS[AB_COUNT];
 
 #define START_MONEY 400
 #define SELL_REFUND_PCT 50
@@ -24,9 +30,10 @@ extern const ObjectSpec OBJECT_SPECS[OBJ_COUNT];
 #define REBUILD_PCT 150
 #define DETECT_PCT 60
 #define JAMMER_SLOW_PCT 40
-#define AIR_COST 60
-#define AIR_DELAY_MS 1500
-#define AIR_RADIUS 25
+#define EW_SLOW_PCT 60          /* EW Pulse; does not stack with a Jammer, the stronger slow wins */
+#define COMBO_WINDOW_MS 2000    /* a kill this soon after the previous one extends the streak */
+#define COMBO_X15_AT 3          /* streak length for x1.5 bounty */
+#define COMBO_X2_AT 6           /* streak length for x2 bounty */
 #define SCORE_PER_NIGHT 100
 #define MISSILE_SPEED 60
 #define SPAWN_WINDOW_MS 40000

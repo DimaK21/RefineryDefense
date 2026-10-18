@@ -53,7 +53,7 @@ static void test_night_waits_for_air(void) {
   night_begin(&g);
   g.wave_len = 0; g.wave_next = 0;
   g.money = 100;
-  CHECK(air_support_call(&g, at(50, 50)));
+  CHECK(ability_use(&g, AB_AIR, at(50, 50)));
   sim_tick(&g, 100);
   CHECK(g.phase == PHASE_NIGHT);                   /* strike pending */
   for (int i = 0; i < 14; i++) sim_tick(&g, 100);
@@ -89,14 +89,18 @@ static void test_air_support(void) {
   night_begin(&g);
   g.wave_len = 0; g.wave_next = 0;
   g.money = 59;
-  CHECK(!air_support_call(&g, at(50, 50)));
+  CHECK(!ability_ready(&g, AB_AIR));
+  CHECK(!ability_use(&g, AB_AIR, at(50, 50)));
   CHECK_EQ(g.money, 59);
   g.money = 100;
-  CHECK(air_support_call(&g, at(50, 50)));
+  CHECK(ability_use(&g, AB_AIR, at(50, 50)));
   CHECK_EQ(g.money, 40);
-  CHECK(g.air_used && g.air_active);
-  CHECK(!air_support_call(&g, at(50, 50)));
-  CHECK_EQ(g.money, 40);
+  CHECK(g.air_active);
+  CHECK_EQ(g.ab_cooldown_ms[AB_AIR], ABILITY_SPECS[AB_AIR].cooldown_ms);
+  g.money = 100;
+  CHECK(!ability_use(&g, AB_AIR, at(50, 50)));     /* on cooldown */
+  CHECK_EQ(g.money, 100);
+  g.money = 40;
   put_drone(&g, 0, DR_SHAHED136, at(60, 50), 1);   /* 10 away: dies */
   put_drone(&g, 1, DR_SHAHED136, at(50, 80), 2);   /* 30 away: lives */
   for (int i = 0; i < 14; i++) sim_tick(&g, 100);
@@ -115,8 +119,38 @@ static void test_air_support(void) {
 
 static void test_air_not_in_day(void) {
   Game g; game_new(&g, 1); g.money = 500;
-  CHECK(!air_support_call(&g, at(50, 50)));
+  for (int a = 0; a < AB_COUNT; a++) CHECK(!ability_use(&g, (Ability)a, at(50, 50)));
   CHECK_EQ(g.money, 500);
+}
+
+static void test_ability_cooldowns(void) {
+  Game g; game_new(&g, 1);
+  night_begin(&g);
+  g.wave_len = 0; g.wave_next = 0;
+  put_drone(&g, 0, DR_SHAHED136, at(10, 10), 1);   /* keeps the night going */
+  g.drones[0].wps[0] = g.drones[0].wps[1] = g.drones[0].wps[2] = at(10, 11);
+  g.money = 1000;
+  CHECK(ability_use(&g, AB_EW, at(50, 50)));
+  CHECK(ability_use(&g, AB_FLARE, at(60, 60)));
+  CHECK_EQ(g.money, 1000 - ABILITY_SPECS[AB_EW].cost - ABILITY_SPECS[AB_FLARE].cost);
+  CHECK_EQ(g.ew_ms, ABILITY_SPECS[AB_EW].duration_ms);
+  CHECK_EQ(g.flare_ms, ABILITY_SPECS[AB_FLARE].duration_ms);
+  CHECK(!ability_ready(&g, AB_EW) && !ability_ready(&g, AB_FLARE) && ability_ready(&g, AB_AIR));
+  for (int a = 0; a < AB_COUNT; a++)                /* a zone never outlives its cooldown */
+    CHECK(ABILITY_SPECS[a].cooldown_ms > ABILITY_SPECS[a].duration_ms);
+  g.drones[0].active = 0;                           /* only the timers below matter now */
+  g.wave_len = 1; g.wave_next = 0; g.wave[0].time_ms = 60000;   /* never spawns: night stays */
+  for (int t = 0; t < ABILITY_SPECS[AB_FLARE].duration_ms; t += 40) sim_tick(&g, 40);
+  CHECK_EQ(g.flare_ms, 0);
+  CHECK(g.ew_ms == 0);                              /* 5 s < 6 s */
+  CHECK(!ability_ready(&g, AB_FLARE));
+  for (int t = ABILITY_SPECS[AB_FLARE].duration_ms; t < ABILITY_SPECS[AB_FLARE].cooldown_ms; t += 40) sim_tick(&g, 40);
+  CHECK(ability_ready(&g, AB_FLARE));
+  CHECK(!ability_ready(&g, AB_EW));
+  CHECK(night_begin(&g) == false);                  /* still night */
+  g.phase = PHASE_DAY;
+  CHECK(night_begin(&g));                           /* a new night resets every cooldown */
+  for (int a = 0; a < AB_COUNT; a++) CHECK_EQ(g.ab_cooldown_ms[a], 0);
 }
 
 static void test_game_over(void) {
@@ -157,6 +191,7 @@ int main(void) {
   RUN(test_report_and_next_night);
   RUN(test_air_support);
   RUN(test_air_not_in_day);
+  RUN(test_ability_cooldowns);
   RUN(test_game_over);
   RUN(test_spawn_pool_full);
   RUN(test_take_events);

@@ -4,6 +4,7 @@
 #include "ui.h"
 #include "ui_colors.h"
 #include "../logic/sim.h"
+#include "../logic/config.h"
 
 #define INPUT_GUARD_MS 600   /* UI tuning: input this soon after the screen appears is ignored */
 
@@ -13,7 +14,8 @@ static bool s_ready;   /* guard elapsed */
 static bool s_down;    /* a touch started after the guard: its liftoff dismisses */
 static Layer *s_layer;
 
-#define ROW_H 24
+#define ROW_H 21
+#define ROWS 6
 #define ROW_MARGIN 12
 
 static void prv_ack(void) {
@@ -33,7 +35,7 @@ static void prv_update(Layer *layer, GContext *ctx) {
   const Game *g = app_game();
   const NightStats *st = &g->stats;
   GRect b = layer_get_bounds(layer);
-  char kicker[16], v[5][16], cash[16];
+  char kicker[16], v[ROWS][16], cash[16];
   snprintf(kicker, sizeof(kicker), "NIGHT %u", (unsigned)nights_survived(g));
   ui_background(ctx, b);
   ui_header(ctx, b, UI_HDR_GOOD, kicker, "SURVIVED");
@@ -42,11 +44,14 @@ static void prv_update(Layer *layer, GContext *ctx) {
   snprintf(v[2], sizeof(v[2]), "+$%ld", (long)st->income);
   snprintf(v[3], sizeof(v[3]), "%u", (unsigned)st->objects_hit);
   snprintf(v[4], sizeof(v[4]), "%u", (unsigned)st->towers_lost);
-  const char *labels[5] = {"Drones downed", "Bounty", "Plant income", "Plant hits", "Towers lost"};
-  GColor colors[5] = {UI_TEXT, UI_ACCENT, UI_GOOD, st->objects_hit ? UI_BAD : UI_TEXT,
-                      st->towers_lost ? UI_BAD : UI_TEXT};
+  snprintf(v[5], sizeof(v[5]), "%u", (unsigned)st->best_combo);
+  const char *labels[ROWS] = {"Drones downed", "Bounty", "Plant income", "Plant hits", "Towers lost",
+                              "Best combo"};
+  GColor colors[ROWS] = {UI_TEXT, UI_ACCENT, UI_GOOD, st->objects_hit ? UI_BAD : UI_TEXT,
+                         st->towers_lost ? UI_BAD : UI_TEXT,
+                         st->best_combo >= COMBO_X15_AT ? UI_ACCENT : UI_TEXT};
   int w = b.size.w - 2 * ROW_MARGIN, y = UI_HEADER_H + 6;
-  for (int i = 0; i < 5; i++, y += ROW_H)
+  for (int i = 0; i < ROWS; i++, y += ROW_H)
     ui_stat_row(ctx, GRect(ROW_MARGIN, y, w, ROW_H), labels[i], v[i], colors[i]);
   snprintf(cash, sizeof(cash), "$%ld", (long)g->money);
   y += 4;

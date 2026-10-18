@@ -163,7 +163,22 @@ static void test_centers(void) {
   CHECK_EQ(o.x, (3 * CELL + CELL) * FX); CHECK_EQ(o.y, (12 * CELL + CELL) * FX);
 }
 
+static void test_ew_pulse_slows(void) {
+  Game g; game_new(&g, 5); WaveEntry e = {0, DR_SHAHED136, 0};
+  CHECK(drone_spawn(&g, &e));
+  Game h = g;
+  h.ew_point = h.drones[0].track; h.ew_ms = 30000;           /* pulse right on the drone */
+  Vec a0 = g.drones[0].track;
+  for (int i = 0; i < 25; i++) { drones_update(&g, 40); drones_update(&h, 40); }
+  int32_t free_d = fx_dist(g.drones[0].track.x - a0.x, g.drones[0].track.y - a0.y);
+  int32_t slow_d = fx_dist(h.drones[0].track.x - a0.x, h.drones[0].track.y - a0.y);
+  /* ~40% of the free flight; per-tick step truncation costs a little */
+  CHECK(slow_d * 100 >= free_d * (100 - EW_SLOW_PCT - 3));
+  CHECK(slow_d * 100 <= free_d * (100 - EW_SLOW_PCT + 3));
+}
+
 int main(void) {
+  RUN(test_ew_pulse_slows);
   RUN(test_object_hit);
   RUN(test_object_destroyed);
   RUN(test_wobble);

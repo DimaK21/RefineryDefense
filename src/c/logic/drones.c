@@ -168,8 +168,10 @@ void drones_update(Game *g, uint16_t dt_ms) {
     }
 
     bool jammed = drone_jammed(g, i);
-    int64_t step = (int64_t)DRONE_SPECS[dr->type].speed * FX * dt_ms;
-    step = jammed ? step * (100 - JAMMER_SLOW_PCT) / 100000 : step / 1000;
+    bool pulsed = g->ew_ms > 0 && fx_within(dr->track.x - g->ew_point.x, dr->track.y - g->ew_point.y,
+                                            ABILITY_SPECS[AB_EW].radius * FX);
+    int slow = pulsed ? EW_SLOW_PCT : jammed ? JAMMER_SLOW_PCT : 0;   /* no stacking: EW is stronger */
+    int64_t step = (int64_t)DRONE_SPECS[dr->type].speed * FX * dt_ms * (100 - slow) / 100000;
 
     Vec w = dr->wps[dr->wp_idx];
     int32_t dx = w.x - dr->track.x, dy = w.y - dr->track.y;

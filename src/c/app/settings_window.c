@@ -64,7 +64,7 @@ static void prv_update(Layer *layer, GContext *ctx) {
                settings_sound() ? CTL_ON : CTL_OFF, s_sel == ROW_SOUND);
   prv_draw_row(ctx, prv_row_rect(b, ROW_VIBE), "Vibration",
                settings_vibe() ? "Hits on the plant" : "No buzzing", settings_vibe() ? CTL_ON : CTL_OFF, s_sel == ROW_VIBE);
-  prv_draw_row(ctx, prv_row_rect(b, ROW_HELP), "How to play", "Rules in 7 short pages", CTL_OPEN,
+  prv_draw_row(ctx, prv_row_rect(b, ROW_HELP), "How to play", "Rules in 8 short pages", CTL_OPEN,
                s_sel == ROW_HELP);
   ui_footer(ctx, b, "v" APP_VERSION);
 }

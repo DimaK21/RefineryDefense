@@ -20,6 +20,13 @@ const DroneSpec DRONE_SPECS[DR_COUNT] = {
   [DR_SHAHED238]   = {"Shahed-238",  22, 26, 35, 0, 15, 6, 7},
 };
 
+const AbilitySpec ABILITY_SPECS[AB_COUNT] = {
+  /*              name         cost cooldown radius duration */
+  [AB_AIR]   = {"Air Strike",  60, 25000, 25, 1500},
+  [AB_EW]    = {"EW Pulse",    25, 12000, 40, 5000},
+  [AB_FLARE] = {"Flare",       15,  8000, 45, 6000},
+};
+
 const ObjectSpec OBJECT_SPECS[OBJ_COUNT] = {
   /*                       name                income cost col row */
   [OBJ_DISTILLATION] = {"Distillation Column", 30, 180,  7,  8},

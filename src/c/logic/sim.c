@@ -16,22 +16,37 @@ bool night_begin(Game *g) {
   memset(&g->stats, 0, sizeof(g->stats));
   g->wave_len = wave_generate(g->wave, MAX_WAVE, g->night, alive_objects(g), g->seed);
   g->wave_next = 0; g->night_ms = 0;
-  g->air_used = 0; g->air_active = 0; g->air_timer_ms = 0;
+  g->air_active = 0; g->air_timer_ms = 0;
+  memset(g->ab_cooldown_ms, 0, sizeof(g->ab_cooldown_ms));
+  g->ew_ms = g->flare_ms = 0;
+  g->combo = 0; g->combo_ms = 0;
   g->events = 0;
   g->phase = PHASE_NIGHT;
   return true;
 }
 
-bool air_support_call(Game *g, Vec p) {
-  if (g->phase != PHASE_NIGHT || g->air_used || g->money < AIR_COST) return false;
-  g->money -= AIR_COST;
-  g->air_used = 1; g->air_active = 1;
-  g->air_point = p; g->air_timer_ms = AIR_DELAY_MS;
+bool ability_ready(const Game *g, Ability a) {
+  return g->phase == PHASE_NIGHT && a < AB_COUNT && g->ab_cooldown_ms[a] == 0
+      && g->money >= ABILITY_SPECS[a].cost;
+}
+
+bool ability_use(Game *g, Ability a, Vec p) {
+  if (!ability_ready(g, a)) return false;
+  const AbilitySpec *s = &ABILITY_SPECS[a];
+  g->money -= s->cost;
+  g->ab_cooldown_ms[a] = s->cooldown_ms;
+  switch (a) {
+    case AB_AIR:   g->air_active = 1; g->air_point = p; g->air_timer_ms = (int16_t)s->duration_ms; break;
+    case AB_EW:    g->ew_point = p; g->ew_ms = (int16_t)s->duration_ms; break;
+    default:       g->flare_point = p; g->flare_ms = (int16_t)s->duration_ms; break;   /* AB_FLARE */
+  }
   return true;
 }
 
+static int16_t count_down(int16_t v, uint16_t dt_ms) { return v > (int16_t)dt_ms ? (int16_t)(v - dt_ms) : 0; }
+
 static void air_strike(Game *g) {
-  int32_t r = AIR_RADIUS * FX;
+  int32_t r = ABILITY_SPECS[AB_AIR].radius * FX;
   for (int i = 0; i < MAX_DRONES; i++) {
     const Drone *d = &g->drones[i];
     if (!d->active) continue;
@@ -44,6 +59,12 @@ static void air_strike(Game *g) {
 void sim_tick(Game *g, uint16_t dt_ms) {
   if (g->phase != PHASE_NIGHT) return;
   g->night_ms += dt_ms;
+  for (int a = 0; a < AB_COUNT; a++)
+    g->ab_cooldown_ms[a] = g->ab_cooldown_ms[a] > dt_ms ? (uint16_t)(g->ab_cooldown_ms[a] - dt_ms) : 0;
+  g->ew_ms = count_down(g->ew_ms, dt_ms);
+  g->flare_ms = count_down(g->flare_ms, dt_ms);
+  g->combo_ms = count_down(g->combo_ms, dt_ms);
+  if (g->combo_ms == 0) g->combo = 0;
   while (g->wave_next < g->wave_len && g->wave[g->wave_next].time_ms <= g->night_ms) {
     if (!drone_spawn(g, &g->wave[g->wave_next])) break;
     g->wave_next++;

@@ -458,9 +458,10 @@ void render_entities(GContext *ctx, const Game *g, const Camera *c) {
           graphics_fill_circle(ctx, prv_vec(c, ef->a), c->zoom + 1);
         }
         break;
-      case FX_AIRSTRIKE: {   /* ring expanding to AIR_RADIUS over the effect's lifetime */
+      case FX_AIRSTRIKE: {   /* ring expanding to the strike radius over the effect's lifetime */
         int ttl = ef->ttl_ms < 0 ? 0 : ef->ttl_ms;
-        int rad = AIRSTRIKE_MIN_UNITS + (AIR_RADIUS - AIRSTRIKE_MIN_UNITS) * (EFFECT_MS - ttl) / EFFECT_MS;
+        int full = ABILITY_SPECS[AB_AIR].radius;
+        int rad = AIRSTRIKE_MIN_UNITS + (full - AIRSTRIKE_MIN_UNITS) * (EFFECT_MS - ttl) / EFFECT_MS;
         graphics_context_set_stroke_color(ctx, COL_EXPLOSION);
         graphics_context_set_stroke_width(ctx, 3);
         graphics_draw_circle(ctx, prv_vec(c, ef->a), rad * c->zoom);

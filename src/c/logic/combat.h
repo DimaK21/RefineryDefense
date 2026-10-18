@@ -2,7 +2,11 @@
 #include "types.h"
 #include "drones.h"
 
-bool    point_in_radar(const Game *g, Vec p);
+/* Inside a radar circle or a burning Flare: drones there are seen and identified, towers there
+ * shoot at full range. */
+bool    point_detected(const Game *g, Vec p);
+/* Bounty percent for a kill streak of `combo` (1 = first kill). */
+int     combo_pct(uint16_t combo);
 int32_t tower_engage_range(const Game *g, int t);
 bool    drone_visible(const Game *g, int d);
 /* Engage range of every tower (0 if inactive or not firing); compute once per tick/frame. */

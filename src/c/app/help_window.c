@@ -20,10 +20,15 @@ static const Page PAGES[] = {
    "Tap a tower or plant unit to manage it. Red arrows at the edges show where tonight's "
    "drones come from. Tap the green arrow twice to start.", false},
   {"Night",
-   "Towers fire on their own. You only see drones near your towers and radars.\n"
-   "Air strike: tap the map to place a mark, tap the mark again to call it. "
-   "$60, once a night.\n"
+   "Towers fire on their own. You only see drones near your towers, radars and flares.\n"
+   "Quick kills in a row make a combo: x1.5 bounty from 3, x2 from 6.\n"
    "Select: x2 speed. Back: pause.", true},
+  {"Abilities",
+   "Up/Down: pick one. Tap the map to aim, tap the mark to use.\n"
+   "Air Strike $60: wipes out drones\n"
+   "EW Pulse $25: slows drones\n"
+   "Flare $15: lights an area, towers in it get full range\n"
+   "Each one then recharges.", true},
   {"Towers",
    "MG Nest: cheap, short range\n"
    "Gepard: solid all-rounder\n"
