@@ -1,27 +1,36 @@
 #include "app.h"
 #include "touch_off_window.h"
+#include "ui.h"
+#include "ui_colors.h"
 
 static Window *s_window;
-static TextLayer *s_text;
+static Layer *s_layer;
+
+static void prv_update(Layer *layer, GContext *ctx) {
+  GRect b = layer_get_bounds(layer);
+  ui_background(ctx, b);
+  ui_skyline(ctx, b);
+  ui_header(ctx, b, UI_HDR_INFO, "REFINERY DEFENSE", "Touch is off");
+  ui_text(ctx, "Turn on touch in the watch Settings to play.", FONT_KEY_GOTHIC_24_BOLD,
+          GRect(12, UI_HEADER_H + 20, b.size.w - 24, 90), GTextAlignmentCenter, UI_TEXT);
+}
 
 static void prv_load(Window *w) {
   Layer *root = window_get_root_layer(w);
-  GRect b = layer_get_bounds(root);
-  s_text = text_layer_create(GRect(8, 60, b.size.w - 16, 100));
-  text_layer_set_font(s_text, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
-  text_layer_set_text_alignment(s_text, GTextAlignmentCenter);
-  text_layer_set_text(s_text, "Touch is off. Enable touch in Settings to play.");
-  layer_add_child(root, text_layer_get_layer(s_text));
+  s_layer = layer_create(layer_get_bounds(root));
+  layer_set_update_proc(s_layer, prv_update);
+  layer_add_child(root, s_layer);
 }
 
 static void prv_unload(Window *w) {
-  text_layer_destroy(s_text);
-  s_text = NULL;
+  layer_destroy(s_layer);
+  s_layer = NULL;
 }
 
 void touch_off_window_push(void) {
   if (!s_window) {
     s_window = window_create();
+    window_set_background_color(s_window, UI_BG);
     window_set_window_handlers(s_window, (WindowHandlers){ .load = prv_load, .unload = prv_unload });
   }
   window_stack_push(s_window, false);

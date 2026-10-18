@@ -11,6 +11,7 @@
 #define MISSILE_UNITS 1
 #define TRAIL_UNITS 6
 #define AIRSTRIKE_MIN_UNITS 3
+#define SPRITE_GRID 11   /* plant sprites are drawn on an 11x11 grid over the object */
 
 static const char OBJECT_LETTERS[OBJ_COUNT] = {'D', 'A', 'B', 'L', 'C'};
 
@@ -63,17 +64,72 @@ static void prv_hp_bar(GContext *ctx, GRect r, int hp, int max, int bar_h) {
   graphics_fill_rect(ctx, bar, 0, GCornerNone);
 }
 
+/* Rect on an SPRITE_GRID x SPRITE_GRID grid laid over `in`. */
+static GRect prv_sp(GRect in, int x, int y, int w, int h) {
+  int u = in.size.w;
+  return GRect(in.origin.x + x * u / SPRITE_GRID, in.origin.y + y * u / SPRITE_GRID,
+               w * u / SPRITE_GRID, h * u / SPRITE_GRID);
+}
+
+static void prv_sp_box(GContext *ctx, GRect r, int radius) {
+  graphics_fill_rect(ctx, r, radius, GCornersAll);
+  graphics_draw_round_rect(ctx, r, radius);
+}
+
+static void prv_sp_disc(GContext *ctx, GRect in, int x, int y, int rad) {
+  int u = in.size.w;
+  GPoint p = GPoint(in.origin.x + x * u / (2 * SPRITE_GRID), in.origin.y + y * u / (2 * SPRITE_GRID));
+  int pr = rad * u / (2 * SPRITE_GRID);
+  graphics_fill_circle(ctx, p, pr);
+  graphics_draw_circle(ctx, p, pr);
+}
+
+/* Pictures of the plant units on a concrete pad; coordinates in sprite cells (discs in half cells). */
+static void prv_object_sprite(GContext *ctx, GRect in, int o, int zoom) {
+  graphics_context_set_fill_color(ctx, COL_PAD);
+  graphics_fill_rect(ctx, in, 2 * zoom, GCornersAll);
+  graphics_context_set_fill_color(ctx, object_color(o));
+  graphics_context_set_stroke_color(ctx, GColorBlack);
+  switch (o) {
+    case OBJ_DISTILLATION:   /* two columns with a pipe bridge */
+      prv_sp_box(ctx, prv_sp(in, 2, 1, 3, 9), zoom);
+      prv_sp_box(ctx, prv_sp(in, 6, 3, 3, 7), zoom);
+      graphics_draw_line(ctx, prv_sp(in, 5, 4, 0, 0).origin, prv_sp(in, 6, 4, 0, 0).origin);
+      for (int y = 4; y < 10; y += 3) {   /* column rings */
+        GRect a = prv_sp(in, 2, y, 3, 0), b = prv_sp(in, 6, y + 1, 3, 0);
+        graphics_draw_line(ctx, a.origin, GPoint(a.origin.x + a.size.w - 1, a.origin.y));
+        if (y + 1 < 10) graphics_draw_line(ctx, b.origin, GPoint(b.origin.x + b.size.w - 1, b.origin.y));
+      }
+      break;
+    case OBJ_TANK_A:
+    case OBJ_TANK_B:         /* four storage tanks */
+      prv_sp_disc(ctx, in, 6, 6, 4);
+      prv_sp_disc(ctx, in, 16, 6, 4);
+      prv_sp_disc(ctx, in, 6, 15, 4);
+      prv_sp_disc(ctx, in, 16, 15, 4);
+      break;
+    case OBJ_TERMINAL:       /* pier, crane and containers */
+      prv_sp_box(ctx, prv_sp(in, 1, 7, 9, 3), 0);
+      prv_sp_box(ctx, prv_sp(in, 2, 1, 2, 6), 0);
+      prv_sp_box(ctx, prv_sp(in, 2, 1, 8, 1), 0);
+      prv_sp_box(ctx, prv_sp(in, 5, 4, 2, 3), 0);
+      prv_sp_box(ctx, prv_sp(in, 7, 4, 2, 3), 0);
+      break;
+    default:                 /* OBJ_CRACKER: reactor, unit block and stack */
+      prv_sp_box(ctx, prv_sp(in, 1, 5, 6, 5), zoom);
+      prv_sp_disc(ctx, in, 8, 7, 3);
+      prv_sp_box(ctx, prv_sp(in, 8, 1, 2, 9), 0);
+      break;
+  }
+}
+
 static void prv_object(GContext *ctx, const Game *g, const Camera *c, int o) {
   const ObjectSpec *s = &OBJECT_SPECS[o];
   GRect r = prv_rect(c, s->col * CELL, s->row * CELL, OBJ_UNITS, OBJ_UNITS);
   GRect in = grect_inset(r, GEdgeInsets(c->zoom));
   switch (g->objects[o].status) {
     case OBJ_ALIVE:
-      graphics_context_set_fill_color(ctx, object_color(o));
-      graphics_fill_rect(ctx, in, 2 * c->zoom, GCornersAll);
-      graphics_context_set_stroke_color(ctx, GColorBlack);
-      graphics_draw_round_rect(ctx, in, 2 * c->zoom);
-      prv_letter(ctx, OBJECT_LETTERS[o], in, GColorBlack);
+      prv_object_sprite(ctx, in, o, c->zoom);
       prv_hp_bar(ctx, in, g->objects[o].hp, OBJECT_MAX_HP, HP_BAR_UNITS * c->zoom);
       break;
     case OBJ_DESTROYED:

@@ -1,4 +1,5 @@
 #include "day_panel.h"
+#include "feedback.h"
 #include "ui_colors.h"
 #include "../logic/config.h"
 #include "../logic/economy.h"
@@ -83,7 +84,7 @@ void day_panel_draw(GContext *ctx, GRect area, const Game *g) {
 
 /* Repair/Reload/Build keep the panel open so the updated cost (now greyed) is visible. */
 static PanelResult prv_stay(ActResult r) {
-  if (r == ACT_NO_MONEY) vibes_short_pulse();
+  if (r == ACT_NO_MONEY) feedback_short();
   return PANEL_RES_NONE;
 }
 

@@ -6,6 +6,8 @@
 #include "night_window.h"
 #include "report_window.h"
 #include "gameover_window.h"
+#include "settings.h"
+#include "settings_window.h"
 
 static Game s_game;
 
@@ -18,6 +20,7 @@ void app_go_report(void) { window_stack_pop_all(false); report_window_push(); }
 void app_go_gameover(void) { window_stack_pop_all(false); gameover_window_push(); }
 
 int main(void) {
+  settings_load();
   if (touch_service_is_enabled()) {
     menu_window_push();
   } else {
@@ -26,6 +29,7 @@ int main(void) {
   app_event_loop();
   window_stack_pop_all(false);
   menu_window_destroy();
+  settings_window_destroy();
   touch_off_window_destroy();
   day_window_destroy();
   night_window_destroy();

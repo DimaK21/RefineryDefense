@@ -1,6 +1,7 @@
 #include "app.h"
 #include "day_window.h"
 #include "day_panel.h"
+#include "feedback.h"
 #include "render.h"
 #include "storage.h"
 #include "ui_colors.h"
@@ -97,11 +98,12 @@ static void prv_draw_hud(GContext *ctx, const Game *g) {
   graphics_context_set_fill_color(ctx, COL_HUD_BG);
   graphics_fill_rect(ctx, GRect(0, 0, w, HUD_H), 0, GCornerNone);
   snprintf(buf, sizeof(buf), "$%ld", (long)g->money);
-  prv_text(ctx, buf, GRect(4, -1, w / 3, HUD_H), GTextAlignmentLeft, COL_HUD_TEXT);
+  prv_text(ctx, buf, GRect(4, -1, w / 3, HUD_H), GTextAlignmentLeft, COL_HUD_MONEY);
   snprintf(buf, sizeof(buf), "DAY %u", (unsigned)g->night);
   prv_text(ctx, buf, GRect(w / 3, -1, w / 3, HUD_H), GTextAlignmentCenter, COL_HUD_TEXT);
-  snprintf(buf, sizeof(buf), "Plant %d%%", plant_health_pct(g));
-  prv_text(ctx, buf, GRect(w * 2 / 3 - 8, -1, w / 3 + 4, HUD_H), GTextAlignmentRight, COL_HUD_TEXT);
+  int hp = plant_health_pct(g);
+  snprintf(buf, sizeof(buf), "Plant %d%%", hp);
+  prv_text(ctx, buf, GRect(w * 2 / 3 - 8, -1, w / 3 + 4, HUD_H), GTextAlignmentRight, health_color(hp));
 }
 
 static void prv_draw_play(GContext *ctx, GRect r) {
@@ -248,7 +250,7 @@ static void prv_tap_cell(Game *g, int col, int row) {
   if (s_ghost && s_ghost_col == col && s_ghost_row == row) {
     ActResult r = tower_buy(g, s_sel, col, row);
     if (r == ACT_OK) s_ghost = false;
-    else vibes_short_pulse();   /* no money (or no free tower slot): keep the ghost */
+    else feedback_short();   /* no money (or no free tower slot): keep the ghost */
     return;
   }
   s_ghost = true;

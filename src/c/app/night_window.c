@@ -63,13 +63,14 @@ static void prv_draw_hud(GContext *ctx, const Game *g, int w) {
   for (int y = 0; y < HUD_H; y += 2) graphics_draw_line(ctx, GPoint(0, y), GPoint(w - 1, y));
   char buf[16];
   snprintf(buf, sizeof(buf), "$%ld", (long)g->money);
-  prv_text(ctx, buf, GRect(3, -3, 50, HUD_H + 4), GTextAlignmentLeft, COL_HUD_TEXT);
+  prv_text(ctx, buf, GRect(3, -3, 50, HUD_H + 4), GTextAlignmentLeft, COL_HUD_MONEY);
   snprintf(buf, sizeof(buf), "NIGHT %u", (unsigned)g->night);
   prv_text(ctx, buf, GRect(52, -3, 70, HUD_H + 4), GTextAlignmentCenter, COL_HUD_TEXT);
   if (s_fast) prv_text(ctx, "x2", GRect(122, -3, 18, HUD_H + 4), GTextAlignmentLeft, COL_SELECT);
   prv_air_icon(ctx, GPoint(148, HUD_H / 2), prv_air_available(g) ? COL_SELECT : COL_DISABLED);
-  snprintf(buf, sizeof(buf), "%d%%", plant_health_pct(g));
-  prv_text(ctx, buf, GRect(w - 48, -3, 45, HUD_H + 4), GTextAlignmentRight, COL_HUD_TEXT);
+  int hp = plant_health_pct(g);
+  snprintf(buf, sizeof(buf), "%d%%", hp);
+  prv_text(ctx, buf, GRect(w - 48, -3, 45, HUD_H + 4), GTextAlignmentRight, health_color(hp));
 }
 
 static void prv_draw_mark(GContext *ctx, GPoint p, GColor col) {
