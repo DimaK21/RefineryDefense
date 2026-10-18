@@ -9,6 +9,22 @@ int32_t wave_budget(uint16_t night, int alive_objects) {
 
 static int side_count(uint16_t night) { return night <= 2 ? 1 : night <= 5 ? 2 : 4; }
 
+/* Partial Fisher-Yates over the four edges: the first n are the active sides. Draws from *rng first,
+ * so wave_sides and wave_generate agree. */
+static int pick_sides(uint32_t *rng, uint16_t night, uint8_t sides[4]) {
+  int ns = side_count(night);
+  for (int i = 0; i < 4; i++) sides[i] = (uint8_t)i;
+  for (int i = 0; i < ns; i++) {
+    int j = rng_range(rng, i, 3); uint8_t t = sides[i]; sides[i] = sides[j]; sides[j] = t;
+  }
+  return ns;
+}
+
+int wave_sides(uint16_t night, uint32_t seed, uint8_t out[4]) {
+  uint32_t rng = seed ? seed : 1;
+  return pick_sides(&rng, night, out);
+}
+
 static void add(WaveEntry *out, uint16_t *n, uint32_t t, uint8_t type, uint8_t side) {
   if (t >= SPAWN_WINDOW_MS) t = SPAWN_WINDOW_MS - 1;
   out[*n].time_ms = (uint16_t)t; out[*n].type = type; out[*n].side = side; (*n)++;
@@ -17,11 +33,8 @@ static void add(WaveEntry *out, uint16_t *n, uint32_t t, uint8_t type, uint8_t s
 uint16_t wave_generate(WaveEntry *out, uint16_t max, uint16_t night, int alive_objects, uint32_t seed) {
   uint32_t rng = seed ? seed : 1;
   int32_t rem = wave_budget(night, alive_objects);
-  uint8_t sides[4] = {0, 1, 2, 3};
-  int ns = side_count(night);
-  for (int i = 0; i < ns; i++) {                 /* partial Fisher-Yates: first ns are the active sides */
-    int j = rng_range(&rng, i, 3); uint8_t t = sides[i]; sides[i] = sides[j]; sides[j] = t;
-  }
+  uint8_t sides[4];
+  int ns = pick_sides(&rng, night, sides);
   uint16_t n = 0;
   while (rem >= 1 && n < max) {
     uint8_t ok[DR_COUNT]; int nok = 0;

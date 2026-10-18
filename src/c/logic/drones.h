@@ -14,4 +14,5 @@ bool drone_jammed(const Game *g, int d);
 Vec  tower_center(const Tower *t);
 Vec  object_center(ObjectId o);
 void drone_retarget(Game *g, int d);
-void effect_add(Game *g, EffectKind k, Vec a, Vec b, int16_t ttl_ms);
+/* NULL when the effect pool is full: effects are cosmetic and may be dropped. */
+Effect *effect_add(Game *g, EffectKind k, Vec a, Vec b, int16_t ttl_ms);

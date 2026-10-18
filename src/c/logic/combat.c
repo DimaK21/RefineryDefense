@@ -57,6 +57,8 @@ void kill_drone(Game *g, int d) {
   g->stats.kills++; g->stats.bounty += bounty;
   g->events |= EV_EXPLOSION;
   effect_add(g, FX_EXPLOSION, dr->pos, dr->pos, EFFECT_MS);
+  Effect *e = effect_add(g, FX_BOUNTY, dr->pos, dr->pos, BOUNTY_MS);
+  if (e) e->value = (uint8_t)bounty;
   dr->active = 0;
 }
 

@@ -38,6 +38,8 @@ extern const ObjectSpec OBJECT_SPECS[OBJ_COUNT];
 #define WAVE_HEAVY_PCT 800   /* min drone threat, % of (remaining budget / free wave slots) */
 #define WAVE_EXTRA_OBJ_PCT 10
 #define EFFECT_MS 400
+#define IMPACT_MS 600   /* drone hitting the plant or a tower: bigger, longer blast */
+#define BOUNTY_MS 700   /* floating "+$N" over a downed drone */
 #define TRACER_MS 120
 #define SWARM_INTERVAL_MS 300
 #define SWARM_MIN 3

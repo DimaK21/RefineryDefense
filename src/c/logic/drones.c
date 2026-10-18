@@ -15,14 +15,15 @@ Vec object_center(ObjectId o) {
   return v;
 }
 
-void effect_add(Game *g, EffectKind k, Vec a, Vec b, int16_t ttl_ms) {
+Effect *effect_add(Game *g, EffectKind k, Vec a, Vec b, int16_t ttl_ms) {
   for (int i = 0; i < MAX_EFFECTS; i++) {
     if (!g->effects[i].active) {
       Effect *e = &g->effects[i];
-      e->active = 1; e->kind = (uint8_t)k; e->ttl_ms = ttl_ms; e->a = a; e->b = b;
-      return;
+      e->active = 1; e->kind = (uint8_t)k; e->value = 0; e->ttl_ms = ttl_ms; e->a = a; e->b = b;
+      return e;
     }
   }
+  return NULL;
 }
 
 bool drone_jammed(const Game *g, int d) {
@@ -152,7 +153,7 @@ static void impact(Game *g, Drone *dr) {
     t->hp = (uint8_t)(t->hp > s->tower_damage ? t->hp - s->tower_damage : 0);
     if (t->hp == 0) { t->active = 0; g->events |= EV_TOWER_LOST; g->stats.towers_lost++; }
   }
-  effect_add(g, FX_EXPLOSION, dr->wps[2], dr->wps[2], EFFECT_MS);
+  effect_add(g, FX_IMPACT, dr->wps[2], dr->wps[2], IMPACT_MS);
   g->events |= EV_EXPLOSION;
 }
 

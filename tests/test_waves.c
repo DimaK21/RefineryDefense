@@ -41,8 +41,25 @@ static void test_heavy_mix(void) {
   CHECK(sum * 10 >= MAX_WAVE * max_threat * 9);        /* uniform picks would average ~3.4 per drone */
 }
 
+static void test_sides_forecast(void) {
+  /* the day screen's raid arrows must name exactly the sides the night will use */
+  WaveEntry w[MAX_WAVE];
+  for (uint32_t seed = 0; seed < 40; seed++)
+    for (uint16_t night = 1; night <= 12; night++) {
+      uint8_t sides[4];
+      int ns = wave_sides(night, seed, sides);
+      CHECK_EQ(ns, night <= 2 ? 1 : night <= 5 ? 2 : 4);
+      int allowed[4] = {0, 0, 0, 0}, seen[4] = {0, 0, 0, 0};
+      for (int i = 0; i < ns; i++) { CHECK(sides[i] < 4); CHECK(!allowed[sides[i]]); allowed[sides[i]] = 1; }
+      uint16_t n = wave_generate(w, MAX_WAVE, night, 2, seed);
+      for (uint16_t i = 0; i < n; i++) { CHECK(allowed[w[i].side]); seen[w[i].side] = 1; }
+      if (ns == 1) CHECK(seen[sides[0]]);
+    }
+}
+
 int main(void) {
   RUN(test_waves);
+  RUN(test_sides_forecast);
   RUN(test_heavy_mix);
   return TEST_SUMMARY();
 }

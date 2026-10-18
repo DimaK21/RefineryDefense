@@ -12,6 +12,7 @@
 #include "../logic/gesture.h"
 #include "../logic/camera.h"
 #include "../logic/sim.h"
+#include "../logic/waves.h"
 
 #define DAY_ZOOM 2
 #define HUD_H 18
@@ -20,6 +21,9 @@
 #define MINI_W 46
 #define MINI_H 44
 #define MINI_MARGIN 2
+#define RAID_ARROW_W 14   /* raid direction chevron: base width and depth, px */
+#define RAID_ARROW_D 7
+#define RAID_EDGE_PX 2    /* minimap edge stripe for a raid side */
 #define START_CONFIRM_MS 2000   /* UI tuning: a second Start tap / Select within this starts the night */
 
 static Window *s_window;
@@ -69,6 +73,33 @@ static void prv_center_camera(void) {
 
 /* ---- drawing ---- */
 
+/* Inward-pointing chevron pair on edge `side` (0 top, 1 right, 2 bottom, 3 left) of rect `r`. */
+static void prv_raid_arrow(GContext *ctx, GRect r, int side) {
+  static const int8_t IN[4][2] = {{0, 1}, {-1, 0}, {0, -1}, {1, 0}};   /* inward unit vector */
+  int ix = IN[side][0], iy = IN[side][1];
+  int cx = r.origin.x + r.size.w / 2, cy = r.origin.y + r.size.h / 2;
+  GPoint edge = side == 0 ? GPoint(cx, r.origin.y + 2) : side == 1 ? GPoint(r.origin.x + r.size.w - 3, cy)
+              : side == 2 ? GPoint(cx, r.origin.y + r.size.h - 3) : GPoint(r.origin.x + 2, cy);
+  graphics_context_set_fill_color(ctx, GColorRed);
+  graphics_context_set_stroke_color(ctx, GColorBlack);
+  for (int k = 0; k < 2; k++) {
+    GPoint b = GPoint(edge.x + ix * k * (RAID_ARROW_D - 1), edge.y + iy * k * (RAID_ARROW_D - 1));
+    int hw = RAID_ARROW_W / 2;
+    GPoint pts[3] = {GPoint(b.x - iy * hw, b.y - ix * hw), GPoint(b.x + iy * hw, b.y + ix * hw),
+                     GPoint(b.x + ix * RAID_ARROW_D, b.y + iy * RAID_ARROW_D)};
+    GPath path = {3, pts, 0, GPointZero};
+    gpath_draw_filled(ctx, &path);
+    gpath_draw_outline(ctx, &path);
+  }
+}
+
+/* Where tonight's drones come from: the same sides night_begin will generate. */
+static void prv_draw_raid(GContext *ctx, const Game *g, GRect r) {
+  uint8_t sides[4];
+  int n = wave_sides(g->night, g->seed, sides);
+  for (int i = 0; i < n; i++) prv_raid_arrow(ctx, r, sides[i]);
+}
+
 static void prv_map_update(Layer *layer, GContext *ctx) {
   const Game *g = app_game();
   render_map(ctx, g, &s_cam, false);
@@ -84,6 +115,7 @@ static void prv_map_update(Layer *layer, GContext *ctx) {
     const ObjectSpec *s = &OBJECT_SPECS[day_panel_index()];
     render_cell_frame(ctx, &s_cam, s->col, s->row, OBJECT_CELLS);
   }
+  prv_draw_raid(ctx, g, layer_get_bounds(layer));
 }
 
 static void prv_text(GContext *ctx, const char *txt, GRect r, GTextAlignment align, GColor color) {
@@ -158,6 +190,17 @@ static void prv_draw_minimap(GContext *ctx, const Game *g) {
   GRect m = prv_mini_rect();
   graphics_context_set_fill_color(ctx, COL_MINIMAP_BG);
   graphics_fill_rect(ctx, m, 0, GCornerNone);
+  uint8_t sides[4];
+  int n = wave_sides(g->night, g->seed, sides);
+  graphics_context_set_fill_color(ctx, GColorRed);
+  for (int i = 0; i < n; i++) {
+    int e = RAID_EDGE_PX;
+    GRect s = sides[i] == 0 ? GRect(m.origin.x, m.origin.y, m.size.w, e)
+            : sides[i] == 1 ? GRect(m.origin.x + m.size.w - e, m.origin.y, e, m.size.h)
+            : sides[i] == 2 ? GRect(m.origin.x, m.origin.y + m.size.h - e, m.size.w, e)
+            : GRect(m.origin.x, m.origin.y, e, m.size.h);
+    graphics_fill_rect(ctx, s, 0, GCornerNone);
+  }
   for (int o = 0; o < OBJ_COUNT; o++) {
     const ObjectSpec *s = &OBJECT_SPECS[o];
     GPoint a = prv_mini_pt(m, s->col * CELL, s->row * CELL);

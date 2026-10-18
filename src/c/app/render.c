@@ -8,6 +8,11 @@
 #define HP_BAR_UNITS 2
 #define DASH_PX 3
 #define EXPLOSION_UNITS 5
+#define IMPACT_UNITS 8
+#define BOUNTY_RISE_UNITS 12
+#define FIRE_FRAME_MS 120    /* flame flicker step at night (the day screen is static) */
+#define SMOKE_FRAME_MS 80
+#define FIRE_HP 66           /* an object at or below this HP burns; at or below FIRE_HP / 2, twice */
 #define MISSILE_UNITS 1
 #define TRAIL_UNITS 6
 #define AIRSTRIKE_MIN_UNITS 3
@@ -123,13 +128,59 @@ static void prv_object_sprite(GContext *ctx, GRect in, int o, int zoom) {
   }
 }
 
-static void prv_object(GContext *ctx, const Game *g, const Camera *c, int o) {
+/* Tongue of fire rising from a disc of radius `w` at `c`: one row per pixel, narrowing to a tip
+ * `h` px above and leaning `sway` px sideways. */
+static void prv_tongue(GContext *ctx, GPoint c, int w, int h, int sway, GColor col) {
+  graphics_context_set_fill_color(ctx, col);
+  graphics_fill_circle(ctx, c, w);
+  graphics_context_set_stroke_color(ctx, col);
+  for (int i = 0; i < h; i++) {
+    int hw = w * (h - i) / h, x = c.x + sway * i / h;
+    graphics_draw_line(ctx, GPoint(x - hw, c.y - i), GPoint(x + hw, c.y - i));
+  }
+}
+
+/* Flame standing on `base`: orange tongue with a yellow core; `flick` 0..2 sways and stretches it. */
+static void prv_flame(GContext *ctx, GPoint base, int s, int flick) {
+  int h = 3 * s + flick * s / 2;
+  int sway = (flick - 1) * s / 2;
+  GPoint c = GPoint(base.x, base.y - s);
+  prv_tongue(ctx, c, s, h, sway, GColorOrange);
+  prv_tongue(ctx, c, s / 2 > 0 ? s / 2 : 1, h * 2 / 3, sway / 2, GColorYellow);
+}
+
+/* Three puffs rising from `from` and growing as they go; `t` drives the drift. Light gray: the
+ * dark concrete pad and the night sky would swallow dark smoke. */
+static void prv_smoke(GContext *ctx, GPoint from, int s, uint32_t t) {
+  if (s < 2) s = 2;
+  int span = 5 * s;
+  graphics_context_set_fill_color(ctx, GColorLightGray);
+  for (int k = 0; k < 3; k++) {
+    int rise = (int)((t / SMOKE_FRAME_MS * (uint32_t)s / 2 + (uint32_t)(k * span / 3)) % (uint32_t)span);
+    int r = s / 2 + rise * s / span;
+    graphics_fill_circle(ctx, GPoint(from.x + (k - 1) * s / 2, from.y - rise), r > 0 ? r : 1);
+  }
+}
+
+/* Damage on a standing object: smoke and one flame, a second flame when badly hurt. */
+static void prv_fire(GContext *ctx, GRect in, int hp, int zoom, uint32_t t) {
+  if (hp > FIRE_HP) return;
+  int s = 2 + zoom;   /* flame half-width, px: readable at night x1 without swamping the day x2 sprite */
+  int f = (int)(t / FIRE_FRAME_MS);
+  GPoint a = prv_sp(in, 3, 8, 0, 0).origin;
+  prv_smoke(ctx, GPoint(a.x, a.y - 3 * s), zoom + 1, t);
+  prv_flame(ctx, a, s, f % 3);
+  if (hp <= FIRE_HP / 2) prv_flame(ctx, prv_sp(in, 8, 9, 0, 0).origin, s, (f + 1) % 3);
+}
+
+static void prv_object(GContext *ctx, const Game *g, const Camera *c, int o, uint32_t t) {
   const ObjectSpec *s = &OBJECT_SPECS[o];
   GRect r = prv_rect(c, s->col * CELL, s->row * CELL, OBJ_UNITS, OBJ_UNITS);
   GRect in = grect_inset(r, GEdgeInsets(c->zoom));
   switch (g->objects[o].status) {
     case OBJ_ALIVE:
       prv_object_sprite(ctx, in, o, c->zoom);
+      prv_fire(ctx, in, g->objects[o].hp, c->zoom, t);
       prv_hp_bar(ctx, in, g->objects[o].hp, OBJECT_MAX_HP, HP_BAR_UNITS * c->zoom);
       break;
     case OBJ_DESTROYED:
@@ -141,6 +192,7 @@ static void prv_object(GContext *ctx, const Game *g, const Camera *c, int o) {
       graphics_draw_line(ctx, GPoint(in.origin.x + in.size.w - 1, in.origin.y),
                          GPoint(in.origin.x, in.origin.y + in.size.h - 1));
       graphics_context_set_stroke_width(ctx, 1);
+      prv_smoke(ctx, prv_sp(in, 5, 3, 0, 0).origin, c->zoom + 1, t);   /* smouldering */
       break;
     default:   /* OBJ_NOT_BUILT */
       graphics_context_set_stroke_color(ctx, COL_NOT_BUILT);
@@ -166,7 +218,8 @@ void render_map(GContext *ctx, const Game *g, const Camera *c, bool night) {
       graphics_draw_line(ctx, GPoint(a.x, y), GPoint(b.x, y));
     }
   }
-  for (int o = 0; o < OBJ_COUNT; o++) prv_object(ctx, g, c, o);
+  uint32_t t = night ? g->night_ms : 0;   /* animation clock; the day screen is a still frame */
+  for (int o = 0; o < OBJ_COUNT; o++) prv_object(ctx, g, c, o, t);
 }
 
 void render_tower_icon(GContext *ctx, int type, GRect r) {
@@ -276,6 +329,57 @@ static void prv_drone(GContext *ctx, const Game *g, const Camera *c, int d) {
   }
 }
 
+/* Explosion by phase: white-hot flash, fireball, burning ring, then a fading ring; debris flies
+ * out on `rays` spokes. `size` is the fireball radius in px. */
+static void prv_blast(GContext *ctx, GPoint p, int left_ms, int total_ms, int size, int rays) {
+  if (left_ms < 0) left_ms = 0;
+  int f = (total_ms - left_ms) * 100 / total_ms;   /* 0..100 elapsed */
+  if (f < 20) {
+    graphics_context_set_fill_color(ctx, GColorYellow);
+    graphics_fill_circle(ctx, p, size * (40 + 3 * f) / 100);
+    graphics_context_set_fill_color(ctx, GColorWhite);
+    graphics_fill_circle(ctx, p, size / 3);
+  } else if (f < 50) {
+    graphics_context_set_fill_color(ctx, GColorOrange);
+    graphics_fill_circle(ctx, p, size);
+    graphics_context_set_fill_color(ctx, GColorYellow);
+    graphics_fill_circle(ctx, p, size / 2);
+  } else if (f < 75) {
+    graphics_context_set_fill_color(ctx, GColorRed);
+    graphics_fill_circle(ctx, p, size * 4 / 5);
+    graphics_context_set_stroke_color(ctx, GColorOrange);
+    graphics_draw_circle(ctx, p, size + 1);
+  } else {
+    graphics_context_set_stroke_color(ctx, GColorDarkCandyAppleRed);
+    graphics_draw_circle(ctx, p, size + 2);
+  }
+  if (f < 20) return;
+  static const int8_t DIRS[8][2] = {{7, 7}, {-7, 7}, {7, -7}, {-7, -7}, {10, 0}, {-10, 0}, {0, 10}, {0, -10}};
+  int dist = size * (50 + 12 * f / 10) / 100;
+  graphics_context_set_fill_color(ctx, f < 60 ? GColorOrange : GColorDarkGray);
+  for (int k = 0; k < rays; k++) {
+    GPoint d = GPoint(p.x + DIRS[k][0] * dist / 10, p.y + DIRS[k][1] * dist / 10);
+    graphics_fill_rect(ctx, GRect(d.x, d.y, 2, 2), 0, GCornerNone);
+  }
+}
+
+/* "+$N" drifting up from a downed drone, dimming at the end; black drop shadow for contrast. */
+static void prv_bounty(GContext *ctx, const Camera *c, const Effect *ef) {
+  int left = ef->ttl_ms < 0 ? 0 : ef->ttl_ms;
+  int el = BOUNTY_MS - left;
+  GPoint p = prv_vec(c, ef->a);
+  p.y -= (4 + BOUNTY_RISE_UNITS * el / BOUNTY_MS) * c->zoom;
+  char buf[8];
+  snprintf(buf, sizeof(buf), "+$%u", (unsigned)ef->value);
+  GFont font = fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD);
+  GRect box = GRect(p.x - 20, p.y - 11, 40, 16);
+  graphics_context_set_text_color(ctx, GColorBlack);
+  graphics_draw_text(ctx, buf, font, GRect(box.origin.x + 1, box.origin.y + 1, box.size.w, box.size.h),
+                     GTextOverflowModeFill, GTextAlignmentCenter, NULL);
+  graphics_context_set_text_color(ctx, el * 10 < BOUNTY_MS * 7 ? GColorYellow : GColorChromeYellow);
+  graphics_draw_text(ctx, buf, font, box, GTextOverflowModeFill, GTextAlignmentCenter, NULL);
+}
+
 void render_entities(GContext *ctx, const Game *g, const Camera *c) {
   static int32_t s_ranges[MAX_TOWERS];   /* once per frame, not per drone */
   combat_engage_ranges(g, s_ranges);
@@ -302,10 +406,16 @@ void render_entities(GContext *ctx, const Game *g, const Camera *c) {
         graphics_context_set_stroke_width(ctx, 1);
         break;
       }
+      case FX_IMPACT:
+        prv_blast(ctx, prv_vec(c, ef->a), ef->ttl_ms, IMPACT_MS, IMPACT_UNITS * c->zoom, 8);
+        break;
+      case FX_BOUNTY:
+        break;   /* text goes on top of everything, below */
       default:   /* FX_EXPLOSION */
-        graphics_context_set_fill_color(ctx, COL_EXPLOSION);
-        graphics_fill_circle(ctx, prv_vec(c, ef->a), EXPLOSION_UNITS * c->zoom);
+        prv_blast(ctx, prv_vec(c, ef->a), ef->ttl_ms, EFFECT_MS, EXPLOSION_UNITS * c->zoom, 4);
         break;
     }
   }
+  for (int e = 0; e < MAX_EFFECTS; e++)
+    if (g->effects[e].active && g->effects[e].kind == FX_BOUNTY) prv_bounty(ctx, c, &g->effects[e]);
 }

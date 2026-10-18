@@ -17,8 +17,8 @@ static const Page PAGES[] = {
    "No timer. Pick a tower in the bottom bar or with Up/Down. Tap an empty cell to see its "
    "range, tap it again to buy. Swipe to move the map.", false},
   {"Day: manage",
-   "Tap a tower to move, sell, repair or reload it. Tap a plant unit to build, repair or "
-   "rebuild it. Tap the green arrow twice to start the night.", false},
+   "Tap a tower or plant unit to manage it. Red arrows at the edges show where tonight's "
+   "drones come from. Tap the green arrow twice to start.", false},
   {"Night",
    "Towers fire on their own. You only see drones near your towers and radars.\n"
    "Air strike: tap the map to place a mark, tap the mark again to call it. "

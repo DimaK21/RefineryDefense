@@ -45,6 +45,14 @@ static void test_mg_kills_switchblade(void) {
   CHECK_EQ(g.stats.bounty, 3);
   CHECK_EQ(g.score, 3);
   CHECK(g.events & EV_EXPLOSION);
+  int bounty_fx = 0;
+  for (int i = 0; i < MAX_EFFECTS; i++)
+    if (g.effects[i].active && g.effects[i].kind == FX_BOUNTY) {
+      bounty_fx++;
+      CHECK_EQ(g.effects[i].value, 3);
+      CHECK_EQ(g.effects[i].ttl_ms, BOUNTY_MS);
+    }
+  CHECK_EQ(bounty_fx, 1);
 }
 
 static void test_visibility(void) {
