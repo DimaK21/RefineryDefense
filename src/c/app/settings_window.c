@@ -2,16 +2,18 @@
 #include "settings_window.h"
 #include "settings.h"
 #include "feedback.h"
+#include "help_window.h"
 #include "ui.h"
 #include "ui_colors.h"
 
-#define ROW_H 52
-#define ROW_GAP 8
+#define ROW_H 44
+#define ROW_GAP 6
 #define ROW_MARGIN 8
 #define TOGGLE_W 38
 #define TOGGLE_H 20
 
-typedef enum { ROW_SOUND, ROW_VIBE, ROW_COUNT } Row;
+typedef enum { ROW_SOUND, ROW_VIBE, ROW_HELP, ROW_COUNT } Row;
+typedef enum { CTL_OFF, CTL_ON, CTL_OPEN } Control;
 
 static Window *s_window;
 static Layer *s_layer;
@@ -19,10 +21,10 @@ static int s_sel;
 static int s_pressed = -1;
 
 static GRect prv_row_rect(GRect b, int i) {
-  return GRect(ROW_MARGIN, UI_HEADER_H + 12 + i * (ROW_H + ROW_GAP), b.size.w - 2 * ROW_MARGIN, ROW_H);
+  return GRect(ROW_MARGIN, UI_HEADER_H + 8 + i * (ROW_H + ROW_GAP), b.size.w - 2 * ROW_MARGIN, ROW_H);
 }
 
-static void prv_draw_row(GContext *ctx, GRect r, const char *title, const char *sub, bool on,
+static void prv_draw_row(GContext *ctx, GRect r, const char *title, const char *sub, Control ctl,
                          bool selected) {
   graphics_context_set_fill_color(ctx, UI_CARD);
   graphics_fill_rect(ctx, r, 6, GCornersAll);
@@ -33,12 +35,21 @@ static void prv_draw_row(GContext *ctx, GRect r, const char *title, const char *
     graphics_context_set_stroke_width(ctx, 1);
   }
   int text_w = r.size.w - TOGGLE_W - 22;
-  ui_text(ctx, title, FONT_KEY_GOTHIC_24_BOLD, GRect(r.origin.x + 10, r.origin.y + 1, text_w, 28),
+  ui_text(ctx, title, FONT_KEY_GOTHIC_24_BOLD, GRect(r.origin.x + 10, r.origin.y - 2, text_w, 28),
           GTextAlignmentLeft, UI_TEXT);
-  ui_text(ctx, sub, FONT_KEY_GOTHIC_14, GRect(r.origin.x + 10, r.origin.y + 29, text_w, 18),
+  ui_text(ctx, sub, FONT_KEY_GOTHIC_14, GRect(r.origin.x + 10, r.origin.y + 23, text_w, 18),
           GTextAlignmentLeft, UI_MUTED);
+  if (ctl == CTL_OPEN) {   /* chevron: opens a screen */
+    int x = r.origin.x + r.size.w - 20, y = r.origin.y + r.size.h / 2;
+    graphics_context_set_stroke_color(ctx, UI_ACCENT);
+    graphics_context_set_stroke_width(ctx, 3);
+    graphics_draw_line(ctx, GPoint(x - 4, y - 6), GPoint(x + 2, y));
+    graphics_draw_line(ctx, GPoint(x + 2, y), GPoint(x - 4, y + 6));
+    graphics_context_set_stroke_width(ctx, 1);
+    return;
+  }
   ui_toggle(ctx, GRect(r.origin.x + r.size.w - TOGGLE_W - 10, r.origin.y + (r.size.h - TOGGLE_H) / 2,
-                       TOGGLE_W, TOGGLE_H), on);
+                       TOGGLE_W, TOGGLE_H), ctl == CTL_ON);
 }
 
 static void prv_update(Layer *layer, GContext *ctx) {
@@ -46,13 +57,19 @@ static void prv_update(Layer *layer, GContext *ctx) {
   ui_background(ctx, b);
   ui_header(ctx, b, UI_HDR_INFO, NULL, "Settings");
   prv_draw_row(ctx, prv_row_rect(b, ROW_SOUND), "Sound", settings_sound() ? "Shots and blasts" : "Silent",
-               settings_sound(), s_sel == ROW_SOUND);
+               settings_sound() ? CTL_ON : CTL_OFF, s_sel == ROW_SOUND);
   prv_draw_row(ctx, prv_row_rect(b, ROW_VIBE), "Vibration",
-               settings_vibe() ? "Hits on the plant" : "No buzzing", settings_vibe(), s_sel == ROW_VIBE);
-  ui_footer(ctx, b, "Tap a row to switch");
+               settings_vibe() ? "Hits on the plant" : "No buzzing", settings_vibe() ? CTL_ON : CTL_OFF, s_sel == ROW_VIBE);
+  prv_draw_row(ctx, prv_row_rect(b, ROW_HELP), "How to play", "Rules in 7 short pages", CTL_OPEN,
+               s_sel == ROW_HELP);
+  ui_footer(ctx, b, "Tap a row to change");
 }
 
 static void prv_toggle(int row) {
+  if (row == ROW_HELP) {
+    help_window_push();
+    return;
+  }
   if (row == ROW_SOUND) {
     settings_set_sound(!settings_sound());
     feedback_sound_preview();
