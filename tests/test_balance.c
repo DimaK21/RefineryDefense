@@ -17,14 +17,16 @@
  *   - at most BAL_EARLY_MAX seeds lost on night BAL_EARLY_NIGHT or earlier: early nights must not
  *     hinge on the seed (raid side vs. where the bot happens to put its towers);
  *   - no seed reaches MAX_NIGHTS, and an idle player (no towers, no abilities) loses on nights 1-3.
- * Reference with START_MONEY 500 over 1000 seeds: mean 15.6, Q1 14, median 18, 1.2% lost by night 5.
- * At START_MONEY 400 it was mean 8.3, Q1 5, median 6, 12.8% lost by night 5. */
+ * Reference with DIFFICULTY_SPECS[DIFF_NORMAL].start_money 500 over 1000 seeds: mean 15.6, Q1 14, median 18, 1.2% lost by night 5.
+ * At DIFFICULTY_SPECS[DIFF_NORMAL].start_money 400 it was mean 8.3, Q1 5, median 6, 12.8% lost by night 5. */
 #define SEEDS 60
 #define BAL_MEAN_MIN 11
 #define BAL_MEAN_MAX 20
 #define BAL_Q1_MIN 6
 #define BAL_EARLY_NIGHT 5
 #define BAL_EARLY_MAX (SEEDS / 20)   /* 5% */
+#define BAL_DIFF_GAP 3        /* Easy / Hard mean nights at least this far from Normal */
+#define BAL_EASY_IDLE_MAX 5   /* an idle player on Easy loses by this night */
 #define MAX_NIGHTS 60
 #define TICKS_CAP 5000
 #define BOT_REACT_TICKS 10   /* the night bot looks at the sky every 400 ms, like a player */
@@ -107,8 +109,8 @@ static void bot_night(Game *g) {
 }
 
 /* Returns nights survived (capped at MAX_NIGHTS); *lost_night = g.night at game over, 0 if none. */
-static int run(uint32_t seed, int smart, int *lost_night) {
-  Game g; game_new(&g, seed);
+static int run(uint32_t seed, int smart, Difficulty d, int *lost_night) {
+  Game g; game_new(&g, seed, d);
   *lost_night = 0;
   while (g.night <= MAX_NIGHTS) {
     if (smart) bot_morning(&g);
@@ -125,36 +127,63 @@ static int run(uint32_t seed, int smart, int *lost_night) {
   return nights_survived(&g);
 }
 
-static void test_balance(void) {
+typedef struct { int mean_x100, q1, early, capped, idle_best, idle_worst; } BalStats;
+
+static BalStats measure(Difficulty d) {
   int smart[SEEDS], lost;
-  int idle_ok = 1, idle_worst = 0, early = 0, capped = 0, sum = 0;
+  BalStats st = {0, 0, 0, 0, 1 << 30, 0};
+  int sum = 0;
   for (int s = 0; s < SEEDS; s++) {
-    smart[s] = run((uint32_t)(s + 1), 1, &lost);
-    if (lost && lost <= BAL_EARLY_NIGHT) early++;
-    capped += smart[s] >= MAX_NIGHTS;
+    smart[s] = run((uint32_t)(s + 1), 1, d, &lost);
+    if (lost && lost <= BAL_EARLY_NIGHT) st.early++;
+    st.capped += smart[s] >= MAX_NIGHTS;
     sum += smart[s];
-    run((uint32_t)(s + 1), 0, &lost);
-    if (!(lost >= 1 && lost <= 3)) idle_ok = 0;
-    if (lost > idle_worst) idle_worst = lost;
+    run((uint32_t)(s + 1), 0, d, &lost);
+    if (!lost) lost = MAX_NIGHTS + 1;
+    if (lost < st.idle_best) st.idle_best = lost;
+    if (lost > st.idle_worst) st.idle_worst = lost;
   }
-  printf("bot nights by seed:");
+  printf("%s: bot nights by seed:", DIFFICULTY_SPECS[d].name);
   for (int s = 0; s < SEEDS; s++) printf("%s%2d", s % 20 ? " " : "\n  ", smart[s]);
   int sorted[SEEDS]; for (int s = 0; s < SEEDS; s++) sorted[s] = smart[s];
   qsort(sorted, SEEDS, sizeof(int), cmp_int);
-  int q1 = sorted[SEEDS / 4];
-  printf("\nbot mean %.2f, min %d, Q1 %d, median %d, Q3 %d, max %d\n", (double)sum / SEEDS, sorted[0], q1,
+  st.q1 = sorted[SEEDS / 4];
+  st.mean_x100 = sum * 100 / SEEDS;
+  printf("\n  bot mean %.2f, min %d, Q1 %d, median %d, Q3 %d, max %d\n", (double)sum / SEEDS, sorted[0], st.q1,
          sorted[SEEDS / 2], sorted[3 * SEEDS / 4], sorted[SEEDS - 1]);
-  printf("lost by night %d: %d of %d; reached the %d-night cap: %d; idle lost by night %d at the latest\n",
-         BAL_EARLY_NIGHT, early, SEEDS, MAX_NIGHTS, capped, idle_worst);
-  CHECK(sum >= BAL_MEAN_MIN * SEEDS);
-  CHECK(sum <= BAL_MEAN_MAX * SEEDS);
-  CHECK(q1 >= BAL_Q1_MIN);
-  CHECK(early <= BAL_EARLY_MAX);
-  CHECK(capped == 0);
-  CHECK(idle_ok);
+  printf("  lost by night %d: %d of %d; reached the %d-night cap: %d; idle lost on nights %d-%d\n",
+         BAL_EARLY_NIGHT, st.early, SEEDS, MAX_NIGHTS, st.capped, st.idle_best, st.idle_worst);
+  return st;
+}
+
+static BalStats s_normal;
+
+static void test_balance(void) {
+  BalStats n = s_normal = measure(DIFF_NORMAL);
+  CHECK(n.mean_x100 >= BAL_MEAN_MIN * 100);
+  CHECK(n.mean_x100 <= BAL_MEAN_MAX * 100);
+  CHECK(n.q1 >= BAL_Q1_MIN);
+  CHECK(n.early <= BAL_EARLY_MAX);
+  CHECK(n.capped == 0);
+  CHECK(n.idle_best >= 1 && n.idle_worst <= 3);
+}
+
+/* Easy and Hard must stay ordered around Normal by a clear margin, and still end. Reference over 60 seeds:
+ * Easy ($600, waves 70%) mean 22.5, Q1 22, 0 lost by night 5; Hard ($500, waves 160%) mean 10.5, Q1 6,
+ * median 13, 4 lost by night 5. Hard with $450 and waves 140% lost 12 of 60 by night 5. */
+static void test_difficulties(void) {
+  BalStats n = s_normal, e = measure(DIFF_EASY), h = measure(DIFF_HARD);
+  CHECK(e.mean_x100 >= n.mean_x100 + BAL_DIFF_GAP * 100);
+  CHECK(h.mean_x100 <= n.mean_x100 - BAL_DIFF_GAP * 100);
+  CHECK(e.early <= BAL_EARLY_MAX);
+  CHECK(e.capped == 0);
+  CHECK(e.idle_worst <= BAL_EASY_IDLE_MAX);            /* even Easy needs towers */
+  CHECK(h.early <= 2 * BAL_EARLY_MAX);
+  CHECK(h.idle_worst <= 3);
 }
 
 int main(void) {
   RUN(test_balance);
+  RUN(test_difficulties);
   return TEST_SUMMARY();
 }

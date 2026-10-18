@@ -11,7 +11,7 @@ static void test_sizes(void) {
 }
 
 static void setup(Game *g) {
-  game_new(g, 7);
+  game_new(g, 7, DIFF_HARD);
   g->money = 1000;
   tower_buy(g, TW_MG, 4, 8);
   tower_buy(g, TW_GEPARD, 7, 8);
@@ -37,7 +37,7 @@ static void test_roundtrip(void) {
   CHECK(pending);
   CHECK(b.phase == PHASE_DAY);
   CHECK_EQ(b.night, 5); CHECK_EQ(b.money, -17); CHECK_EQ(b.score, 4321);
-  CHECK_EQ(b.seed, a.seed); CHECK_EQ(b.rng, a.rng);
+  CHECK_EQ(b.seed, a.seed); CHECK_EQ(b.rng, a.rng); CHECK_EQ(b.difficulty, DIFF_HARD);
   for (int i = 0; i < OBJ_COUNT; i++) {
     CHECK_EQ(b.objects[i].status, a.objects[i].status);
     CHECK_EQ(b.objects[i].hp, a.objects[i].hp);
@@ -104,7 +104,7 @@ static void test_blob(void) {
    save written after report_ack is byte-identical: no double income on Continue. */
 static void test_save_at_report(void) {
   static Game g, b;
-  game_new(&g, 3);
+  game_new(&g, 3, DIFF_NORMAL);
   CHECK(night_begin(&g));
   for (int i = 0; i < 20000 && g.phase == PHASE_NIGHT; i++) sim_tick(&g, 40);
   CHECK(g.phase == PHASE_REPORT);
@@ -124,7 +124,7 @@ static void test_save_at_report(void) {
 }
 
 static void test_wave_identical(void) {
-  Game a, b; memset(&b, 0, sizeof b); game_new(&a, 11);
+  Game a, b; memset(&b, 0, sizeof b); game_new(&a, 11, DIFF_NORMAL);
   a.night = 3; a.objects[OBJ_TERMINAL].status = OBJ_ALIVE; a.objects[OBJ_TERMINAL].hp = 100;
   uint8_t h[SAVE_HDR_LEN], t[SAVE_TOWERS_LEN];
   save_write_header(&a, true, h, sizeof h);
@@ -164,6 +164,7 @@ static void test_rejects(void) {
   memcpy(x, h, sizeof h); x[20] = 3; expect_reject(x, sizeof x, t, sizeof t);
   memcpy(x, h, sizeof h); x[23] = 101; expect_reject(x, sizeof x, t, sizeof t);
   memcpy(x, h, sizeof h); x[22] = OBJ_ALIVE; x[23] = 0; expect_reject(x, sizeof x, t, sizeof t);
+  memcpy(x, h, sizeof h); x[30] = DIFF_COUNT; expect_reject(x, sizeof x, t, sizeof t);
 
   memcpy(y, t, sizeof t); y[1] = 99; expect_reject(h, sizeof h, y, sizeof y);
   memcpy(y, t, sizeof t); y[2] = GRID_COLS; expect_reject(h, sizeof h, y, sizeof y);
@@ -180,6 +181,27 @@ static void test_rejects(void) {
   expect_reject(h, sizeof h, y, sizeof y);
 }
 
+/* A version-1 save (no difficulty byte) still loads, as Normal. */
+static void test_v1(void) {
+  static Game a, b;
+  setup(&a);
+  uint8_t buf[SAVE_LEN], v1[SAVE_LEN_V1];
+  save_write(&a, true, buf, sizeof buf);
+  memcpy(v1, buf, SAVE_HDR_LEN_V1);
+  memcpy(v1 + SAVE_HDR_LEN_V1, buf + SAVE_HDR_LEN, SAVE_TOWERS_LEN);
+  v1[0] = 1;
+  bool pending = false;
+  CHECK(save_read_blob(&b, &pending, v1, sizeof v1));
+  CHECK(pending);
+  CHECK_EQ(b.difficulty, DIFF_NORMAL);
+  CHECK_EQ(b.night, 5); CHECK_EQ(b.score, 4321);
+  CHECK_EQ(b.towers[1].type, a.towers[1].type); CHECK_EQ(b.towers[1].ammo, a.towers[1].ammo);
+  v1[0] = SAVE_VERSION;                                       /* v2 tag on a v1 length */
+  CHECK(!save_read_blob(&b, &pending, v1, sizeof v1));
+  buf[0] = 1;                                                 /* v1 tag on a v2 length */
+  CHECK(!save_read_blob(&b, &pending, buf, sizeof buf));
+}
+
 static void test_best(void) {
   Best b = {0, 0};
   CHECK(best_update(&b, 3, 500)); CHECK(!best_update(&b, 3, 400));
@@ -189,6 +211,6 @@ static void test_best(void) {
 
 int main(void) {
   RUN(test_sizes); RUN(test_roundtrip); RUN(test_blob); RUN(test_save_at_report); RUN(test_wave_identical);
-  RUN(test_rejects); RUN(test_best);
+  RUN(test_rejects); RUN(test_v1); RUN(test_best);
   return TEST_SUMMARY();
 }

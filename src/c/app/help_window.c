@@ -12,7 +12,7 @@ typedef struct { const char *title; const char *body; bool small; } Page;
 static const Page PAGES[] = {
   {"The goal",
    "Drones raid your oil refinery every night. Keep at least one plant unit alive. "
-   "Your record is how many nights you survive.", false},
+   "Your record is how many nights you survive. Easy, Normal and Hard each keep their own.", true},
   {"Day: build",
    "No timer. Pick a tower in the bottom bar or with Up/Down. Tap an empty cell to see its "
    "range, tap it again to buy. Swipe to move the map.", false},

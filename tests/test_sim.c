@@ -19,7 +19,7 @@ static void put_drone(Game *g, int i, int type, Vec pos, uint16_t uid) {
 }
 
 static void test_begin_and_full_night(void) {
-  Game g; game_new(&g, 3);
+  Game g; game_new(&g, 3, DIFF_NORMAL);
   CHECK(night_begin(&g));
   CHECK(!night_begin(&g));
   CHECK(g.phase == PHASE_NIGHT);
@@ -28,28 +28,28 @@ static void test_begin_and_full_night(void) {
   CHECK(g.phase == PHASE_REPORT);                  /* seed 3, undefended: survives night 1 */
   CHECK_EQ(g.night, 2);
   CHECK_EQ(g.stats.kills, 0);
-  CHECK_EQ(g.money, START_MONEY + g.stats.bounty + g.stats.income);
+  CHECK_EQ(g.money, DIFFICULTY_SPECS[DIFF_NORMAL].start_money + g.stats.bounty + g.stats.income);
   CHECK(g.score >= SCORE_PER_NIGHT);
 }
 
 static void test_defended_night(void) {
-  Game g; game_new(&g, 3);
+  Game g; game_new(&g, 3, DIFF_NORMAL);
   int n = 0;
   n += tower_buy(&g, TW_MG, 4, 8) == ACT_OK;
   n += tower_buy(&g, TW_MG, 7, 8) == ACT_OK;
   n += tower_buy(&g, TW_MG, 10, 8) == ACT_OK;
   CHECK(n > 0);
-  int32_t spent = START_MONEY - g.money;
+  int32_t spent = DIFFICULTY_SPECS[DIFF_NORMAL].start_money - g.money;
   CHECK(night_begin(&g));
   for (int i = 0; i < 3000 && g.phase == PHASE_NIGHT; i++) sim_tick(&g, 40);
   CHECK(g.phase == PHASE_REPORT);
   CHECK(g.stats.kills > 0);
-  CHECK_EQ(g.money, START_MONEY - spent + g.stats.bounty + g.stats.income);
+  CHECK_EQ(g.money, DIFFICULTY_SPECS[DIFF_NORMAL].start_money - spent + g.stats.bounty + g.stats.income);
   CHECK_EQ(g.score, (uint32_t)g.stats.bounty + SCORE_PER_NIGHT);
 }
 
 static void test_night_waits_for_air(void) {
-  Game g; game_new(&g, 1);
+  Game g; game_new(&g, 1, DIFF_NORMAL);
   night_begin(&g);
   g.wave_len = 0; g.wave_next = 0;
   g.money = 100;
@@ -62,7 +62,7 @@ static void test_night_waits_for_air(void) {
 }
 
 static void test_report_and_next_night(void) {
-  Game g; game_new(&g, 3);
+  Game g; game_new(&g, 3, DIFF_NORMAL);
   night_begin(&g);
   uint32_t seed1 = g.seed;
   WaveEntry first[MAX_WAVE]; uint16_t len1 = g.wave_len;
@@ -73,7 +73,7 @@ static void test_report_and_next_night(void) {
   CHECK_EQ(g.night, 2);
   CHECK_EQ(nights_survived(&g), 1);
   CHECK_EQ(g.stats.income, morning_income(&g));
-  CHECK_EQ(g.money, START_MONEY + g.stats.bounty + g.stats.income);
+  CHECK_EQ(g.money, DIFFICULTY_SPECS[DIFF_NORMAL].start_money + g.stats.bounty + g.stats.income);
   CHECK(g.score >= SCORE_PER_NIGHT);
   CHECK(g.seed != seed1);
   sim_tick(&g, 40);
@@ -85,7 +85,7 @@ static void test_report_and_next_night(void) {
 }
 
 static void test_air_support(void) {
-  Game g; game_new(&g, 1);
+  Game g; game_new(&g, 1, DIFF_NORMAL);
   night_begin(&g);
   g.wave_len = 0; g.wave_next = 0;
   g.money = 59;
@@ -118,13 +118,13 @@ static void test_air_support(void) {
 }
 
 static void test_air_not_in_day(void) {
-  Game g; game_new(&g, 1); g.money = 500;
+  Game g; game_new(&g, 1, DIFF_NORMAL); g.money = 500;
   for (int a = 0; a < AB_COUNT; a++) CHECK(!ability_use(&g, (Ability)a, at(50, 50)));
   CHECK_EQ(g.money, 500);
 }
 
 static void test_ability_cooldowns(void) {
-  Game g; game_new(&g, 1);
+  Game g; game_new(&g, 1, DIFF_NORMAL);
   night_begin(&g);
   g.wave_len = 0; g.wave_next = 0;
   put_drone(&g, 0, DR_SHAHED136, at(10, 10), 1);   /* keeps the night going */
@@ -154,17 +154,17 @@ static void test_ability_cooldowns(void) {
 }
 
 static void test_game_over(void) {
-  Game g; game_new(&g, 1);
+  Game g; game_new(&g, 1, DIFF_NORMAL);
   night_begin(&g);
   for (int o = 0; o < OBJ_COUNT; o++) g.objects[o].status = OBJ_DESTROYED;
   sim_tick(&g, 40);
   CHECK(g.phase == PHASE_GAME_OVER);
   CHECK_EQ(g.night, 1);
-  CHECK_EQ(g.money, START_MONEY);
+  CHECK_EQ(g.money, DIFFICULTY_SPECS[DIFF_NORMAL].start_money);
 }
 
 static void test_spawn_pool_full(void) {
-  Game g; game_new(&g, 1);
+  Game g; game_new(&g, 1, DIFF_NORMAL);
   night_begin(&g);
   g.wave_len = 1; g.wave_next = 0;
   g.wave[0].time_ms = 0; g.wave[0].type = DR_SHAHED136; g.wave[0].side = 0;
@@ -177,7 +177,7 @@ static void test_spawn_pool_full(void) {
 }
 
 static void test_take_events(void) {
-  Game g; game_new(&g, 1);
+  Game g; game_new(&g, 1, DIFF_NORMAL);
   g.events = EV_MISSILE | EV_EXPLOSION;
   CHECK_EQ(sim_take_events(&g), EV_MISSILE | EV_EXPLOSION);
   CHECK_EQ(g.events, 0);

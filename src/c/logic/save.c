@@ -25,6 +25,7 @@ size_t save_write_header(const Game *g, bool pending_night, uint8_t *buf, size_t
     buf[20 + 2 * i] = g->objects[i].status;
     buf[21 + 2 * i] = g->objects[i].hp;
   }
+  buf[30] = g->difficulty;
   return SAVE_HDR_LEN;
 }
 
@@ -44,8 +45,11 @@ size_t save_write_towers(const Game *g, uint8_t *buf, size_t cap) {
 
 bool save_read(Game *g, bool *pending_night, const uint8_t *hdr, size_t hdr_len,
                const uint8_t *tw, size_t tw_len) {
-  if (!g || !hdr || !tw || hdr_len != SAVE_HDR_LEN || tw_len != SAVE_TOWERS_LEN) return false;
-  if (hdr[0] != SAVE_VERSION || hdr[1] > 1) return false;
+  if (!g || !hdr || !tw || tw_len != SAVE_TOWERS_LEN) return false;
+  bool v1 = hdr_len == SAVE_HDR_LEN_V1 && hdr[0] == 1;
+  if (!v1 && (hdr_len != SAVE_HDR_LEN || hdr[0] != SAVE_VERSION)) return false;
+  uint8_t diff = v1 ? DIFF_NORMAL : hdr[30];
+  if (hdr[1] > 1 || diff >= DIFF_COUNT) return false;
   if (get_u16(hdr + 2) < 1) return false;
   for (int i = 0; i < OBJ_COUNT; i++) {
     uint8_t st = hdr[20 + 2 * i], hp = hdr[21 + 2 * i];
@@ -67,6 +71,7 @@ bool save_read(Game *g, bool *pending_night, const uint8_t *hdr, size_t hdr_len,
     used[bit >> 3] |= (uint8_t)(1u << (bit & 7));
   }
   memset(g, 0, sizeof(*g));
+  g->difficulty = diff;
   g->night = get_u16(hdr + 2);
   g->money = (int32_t)get_u32(hdr + 4);
   g->score = get_u32(hdr + 8);
@@ -94,8 +99,9 @@ size_t save_write(const Game *g, bool pending_night, uint8_t *buf, size_t cap) {
 }
 
 bool save_read_blob(Game *g, bool *pending_night, const uint8_t *buf, size_t len) {
-  if (!buf || len != SAVE_LEN) return false;
-  return save_read(g, pending_night, buf, SAVE_HDR_LEN, buf + SAVE_HDR_LEN, SAVE_TOWERS_LEN);
+  if (!buf || (len != SAVE_LEN && len != SAVE_LEN_V1)) return false;
+  size_t hdr_len = len - SAVE_TOWERS_LEN;
+  return save_read(g, pending_night, buf, hdr_len, buf + hdr_len, SAVE_TOWERS_LEN);
 }
 
 bool best_update(Best *b, uint16_t nights, uint32_t score) {

@@ -241,9 +241,9 @@ static void prv_finish_night(Game *g) {
     app_go_report();
     return;
   }
-  Best b = storage_best();
+  Best b = storage_best((Difficulty)g->difficulty);
   bool record = best_update(&b, nights_survived(g), g->score);
-  if (record) storage_set_best(b);
+  if (record) storage_set_best((Difficulty)g->difficulty, b);
   storage_clear();
   gameover_window_set_record(record);
   app_go_gameover();

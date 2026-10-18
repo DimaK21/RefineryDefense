@@ -3,6 +3,7 @@
 #include "storage.h"
 #include "ui.h"
 #include "ui_colors.h"
+#include "../logic/config.h"
 #include "../logic/sim.h"
 
 #define INPUT_GUARD_MS 600   /* UI tuning: input this soon after the screen appears is ignored */
@@ -25,12 +26,12 @@ static void prv_guard_done(void *ctx) {
 
 static void prv_update(Layer *layer, GContext *ctx) {
   const Game *g = app_game();
-  Best best = storage_best();
+  Best best = storage_best((Difficulty)g->difficulty);
   GRect b = layer_get_bounds(layer);
   int w = b.size.w;
   char nights[8], score[16], rec[24];
   ui_background(ctx, b);
-  ui_header(ctx, b, UI_HDR_BAD, NULL, "GAME OVER");
+  ui_header(ctx, b, UI_HDR_BAD, DIFFICULTY_SPECS[g->difficulty].name, "GAME OVER");
   ui_text(ctx, "The refinery has fallen", FONT_KEY_GOTHIC_14, GRect(0, UI_HEADER_H + 4, w, 18),
           GTextAlignmentCenter, UI_MUTED);
   snprintf(nights, sizeof(nights), "%u", (unsigned)nights_survived(g));

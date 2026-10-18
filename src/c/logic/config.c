@@ -27,6 +27,16 @@ const AbilitySpec ABILITY_SPECS[AB_COUNT] = {
   [AB_FLARE] = {"Flare",       15,  8000, 45, 6000},
 };
 
+/* Normal $500: $400 bought radar + 4 shooters with $0 left and early leaks snowballed. Hard keeps $500:
+ * less start money mostly added early losses decided by the seed, bigger raids raise the pressure evenly
+ * (test_balance.c). */
+const DifficultySpec DIFFICULTY_SPECS[DIFF_COUNT] = {
+  /*                name     money wave% */
+  [DIFF_EASY]   = {"Easy",    600,  70},
+  [DIFF_NORMAL] = {"Normal",  500, 100},
+  [DIFF_HARD]   = {"Hard",    500, 160},
+};
+
 const ObjectSpec OBJECT_SPECS[OBJ_COUNT] = {
   /*                       name                income cost col row */
   [OBJ_DISTILLATION] = {"Distillation Column", 30, 180,  7,  8},

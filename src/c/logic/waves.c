@@ -2,9 +2,10 @@
 #include "config.h"
 #include "rng.h"
 
-int32_t wave_budget(uint16_t night, int alive_objects) {
+int32_t wave_budget(uint16_t night, int alive_objects, Difficulty d) {
   int extra = alive_objects > 2 ? alive_objects - 2 : 0;
-  return (WAVE_BASE + WAVE_PER_NIGHT * (int32_t)night + (int32_t)night * night * WAVE_NIGHT_SQ) * (100 + WAVE_EXTRA_OBJ_PCT * extra) / 100;
+  int32_t b = (WAVE_BASE + WAVE_PER_NIGHT * (int32_t)night + (int32_t)night * night * WAVE_NIGHT_SQ) * (100 + WAVE_EXTRA_OBJ_PCT * extra) / 100;
+  return b * DIFFICULTY_SPECS[d < DIFF_COUNT ? d : DIFF_NORMAL].wave_pct / 100;
 }
 
 static int side_count(uint16_t night) { return night <= 2 ? 1 : night <= 5 ? 2 : 4; }
@@ -30,9 +31,10 @@ static void add(WaveEntry *out, uint16_t *n, uint32_t t, uint8_t type, uint8_t s
   out[*n].time_ms = (uint16_t)t; out[*n].type = type; out[*n].side = side; (*n)++;
 }
 
-uint16_t wave_generate(WaveEntry *out, uint16_t max, uint16_t night, int alive_objects, uint32_t seed) {
+uint16_t wave_generate(WaveEntry *out, uint16_t max, uint16_t night, int alive_objects, Difficulty d,
+                       uint32_t seed) {
   uint32_t rng = seed ? seed : 1;
-  int32_t rem = wave_budget(night, alive_objects);
+  int32_t rem = wave_budget(night, alive_objects, d);
   uint8_t sides[4];
   int ns = pick_sides(&rng, night, sides);
   uint16_t n = 0;

@@ -3,13 +3,14 @@
 #include "config.h"
 #include "rng.h"
 
-void game_new(Game *g, uint32_t seed) {
+void game_new(Game *g, uint32_t seed, Difficulty d) {
   memset(g, 0, sizeof(*g));
   g->rng = seed ? seed : 1;
   g->seed = rng_next(&g->rng);
   g->phase = PHASE_DAY;
   g->night = 1;
-  g->money = START_MONEY;
+  g->difficulty = (uint8_t)(d < DIFF_COUNT ? d : DIFF_NORMAL);
+  g->money = DIFFICULTY_SPECS[g->difficulty].start_money;
   g->objects[OBJ_DISTILLATION].status = OBJ_ALIVE;
   g->objects[OBJ_DISTILLATION].hp = OBJECT_MAX_HP;
   g->objects[OBJ_TANK_A].status = OBJ_ALIVE;

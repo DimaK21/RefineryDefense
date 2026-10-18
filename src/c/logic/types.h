@@ -19,6 +19,7 @@ typedef enum { DR_SWITCHBLADE, DR_SHAHED136, DR_GERBERA, DR_HARPY, DR_SHAHED238,
 typedef enum { OBJ_DISTILLATION, OBJ_TANK_A, OBJ_TANK_B, OBJ_TERMINAL, OBJ_CRACKER } ObjectId;
 typedef enum { OBJ_NOT_BUILT, OBJ_ALIVE, OBJ_DESTROYED } ObjectStatus;
 typedef enum { AB_AIR, AB_EW, AB_FLARE, AB_COUNT } Ability;
+typedef enum { DIFF_EASY, DIFF_NORMAL, DIFF_HARD, DIFF_COUNT } Difficulty;
 typedef enum { PHASE_DAY, PHASE_NIGHT, PHASE_REPORT, PHASE_GAME_OVER } Phase;
 typedef enum { TGT_OBJECT, TGT_TOWER } TargetKind;
 typedef enum { FX_EXPLOSION, FX_TRACER, FX_AIRSTRIKE, FX_IMPACT, FX_BOUNTY, FX_SPAWN } EffectKind;
@@ -34,7 +35,7 @@ typedef struct { uint16_t time_ms; uint8_t type, side; } WaveEntry;   // side: 0
 typedef struct { uint16_t kills, best_combo; int32_t bounty, income; uint8_t objects_hit, towers_lost; } NightStats;
 
 typedef struct {
-  Phase phase; uint16_t night; int32_t money; uint32_t score, seed, rng;
+  Phase phase; uint8_t difficulty; uint16_t night; int32_t money; uint32_t score, seed, rng;
   RefObject objects[OBJ_COUNT];
   Tower towers[MAX_TOWERS]; Drone drones[MAX_DRONES];
   Missile missiles[MAX_MISSILES]; Effect effects[MAX_EFFECTS];

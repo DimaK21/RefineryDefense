@@ -6,9 +6,11 @@
 static int threat(const WaveEntry *e) { return DRONE_SPECS[e->type].threat; }
 
 static void test_waves(void) {
-  CHECK_EQ(wave_budget(1, 2), 12); CHECK_EQ(wave_budget(1, 4), 14); CHECK_EQ(wave_budget(10, 1), 210);
+  CHECK_EQ(wave_budget(10, 1, DIFF_EASY), 210 * DIFFICULTY_SPECS[DIFF_EASY].wave_pct / 100);
+  CHECK_EQ(wave_budget(10, 1, DIFF_HARD), 210 * DIFFICULTY_SPECS[DIFF_HARD].wave_pct / 100);
+  CHECK_EQ(wave_budget(1, 2, DIFF_NORMAL), 12); CHECK_EQ(wave_budget(1, 4, DIFF_NORMAL), 14); CHECK_EQ(wave_budget(10, 1, DIFF_NORMAL), 210);
   WaveEntry w[MAX_WAVE], w2[MAX_WAVE];
-  uint16_t n = wave_generate(w, MAX_WAVE, 1, 2, 123);
+  uint16_t n = wave_generate(w, MAX_WAVE, 1, 2, DIFF_NORMAL, 123);
   CHECK(n > 0);
   int sum = 0;
   for (uint16_t i = 0; i < n; i++) {
@@ -17,27 +19,27 @@ static void test_waves(void) {
   }
   CHECK(sum <= 32);
   for (uint16_t i = 1; i < n; i++) CHECK(w[i - 1].time_ms <= w[i].time_ms);
-  CHECK_EQ(wave_generate(w2, MAX_WAVE, 1, 2, 123), n); CHECK(memcmp(w, w2, n * sizeof *w) == 0);
-  n = wave_generate(w, MAX_WAVE, 3, 2, 9);
+  CHECK_EQ(wave_generate(w2, MAX_WAVE, 1, 2, DIFF_NORMAL, 123), n); CHECK(memcmp(w, w2, n * sizeof *w) == 0);
+  n = wave_generate(w, MAX_WAVE, 3, 2, DIFF_NORMAL, 9);
   for (uint16_t i = 0; i < n; i++) CHECK(w[i].type != DR_HARPY && w[i].type != DR_SHAHED238);
-  n = wave_generate(w, MAX_WAVE, 8, 2, 9);
+  n = wave_generate(w, MAX_WAVE, 8, 2, DIFF_NORMAL, 9);
   int seen[4] = {0, 0, 0, 0};
   for (uint16_t i = 0; i < n; i++) { CHECK(w[i].side < 4); seen[w[i].side] = 1; }
   CHECK(seen[0] && seen[1] && seen[2] && seen[3]);
-  n = wave_generate(w, MAX_WAVE, 200, 5, 9); CHECK(n <= MAX_WAVE);
-  CHECK_EQ(wave_generate(w, 7, 200, 5, 9), 7);                 /* small pool truncates */
-  CHECK_EQ(wave_generate(w, MAX_WAVE, 1, 2, 0) > 0, 1);        /* zero seed is valid */
+  n = wave_generate(w, MAX_WAVE, 200, 5, DIFF_NORMAL, 9); CHECK(n <= MAX_WAVE);
+  CHECK_EQ(wave_generate(w, 7, 200, 5, DIFF_NORMAL, 9), 7);                 /* small pool truncates */
+  CHECK_EQ(wave_generate(w, MAX_WAVE, 1, 2, DIFF_NORMAL, 0) > 0, 1);        /* zero seed is valid */
 }
 
 static void test_heavy_mix(void) {
   /* huge budget: slots, not budget, limit the wave, so it must be spent on the heaviest unlocked type */
   WaveEntry w[MAX_WAVE];
-  uint16_t n = wave_generate(w, MAX_WAVE, 100, 2, 5);
+  uint16_t n = wave_generate(w, MAX_WAVE, 100, 2, DIFF_NORMAL, 5);
   int sum = 0, max_threat = 0;
   for (int d = 0; d < DR_COUNT; d++) if (DRONE_SPECS[d].threat > max_threat) max_threat = DRONE_SPECS[d].threat;
   for (uint16_t i = 0; i < n; i++) sum += threat(&w[i]);
   CHECK_EQ(n, MAX_WAVE);
-  CHECK(wave_budget(100, 2) > MAX_WAVE * max_threat);
+  CHECK(wave_budget(100, 2, DIFF_NORMAL) > MAX_WAVE * max_threat);
   CHECK(sum * 10 >= MAX_WAVE * max_threat * 9);        /* uniform picks would average ~3.4 per drone */
 }
 
@@ -51,7 +53,7 @@ static void test_sides_forecast(void) {
       CHECK_EQ(ns, night <= 2 ? 1 : night <= 5 ? 2 : 4);
       int allowed[4] = {0, 0, 0, 0}, seen[4] = {0, 0, 0, 0};
       for (int i = 0; i < ns; i++) { CHECK(sides[i] < 4); CHECK(!allowed[sides[i]]); allowed[sides[i]] = 1; }
-      uint16_t n = wave_generate(w, MAX_WAVE, night, 2, seed);
+      uint16_t n = wave_generate(w, MAX_WAVE, night, 2, DIFF_NORMAL, seed);
       for (uint16_t i = 0; i < n; i++) { CHECK(allowed[w[i].side]); seen[w[i].side] = 1; }
       if (ns == 1) CHECK(seen[sides[0]]);
     }

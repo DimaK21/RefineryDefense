@@ -1,7 +1,7 @@
 #pragma once
 #include "types.h"
 
-void game_new(Game *g, uint32_t seed);
+void game_new(Game *g, uint32_t seed, Difficulty d);
 int alive_objects(const Game *g);
 
 typedef enum { ACT_OK, ACT_NO_MONEY, ACT_BLOCKED, ACT_INVALID } ActResult;

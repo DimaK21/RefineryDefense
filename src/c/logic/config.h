@@ -16,6 +16,10 @@ typedef struct {
 } AbilitySpec;
 
 typedef struct {
+  const char *name; uint16_t start_money; uint8_t wave_pct;   /* wave threat budget, % of Normal */
+} DifficultySpec;
+
+typedef struct {
   const char *name; uint8_t income; uint16_t build_cost; uint8_t col, row;  /* occupies 2x2 cells */
 } ObjectSpec;
 
@@ -23,8 +27,8 @@ extern const TowerSpec TOWER_SPECS[TW_COUNT];
 extern const DroneSpec DRONE_SPECS[DR_COUNT];
 extern const ObjectSpec OBJECT_SPECS[OBJ_COUNT];
 extern const AbilitySpec ABILITY_SPECS[AB_COUNT];
+extern const DifficultySpec DIFFICULTY_SPECS[DIFF_COUNT];
 
-#define START_MONEY 500   /* $400 bought radar + 4 shooters with $0 left: early leaks snowballed (test_balance.c) */
 #define SELL_REFUND_PCT 50
 #define TOWER_REPAIR_PCT 30
 #define REBUILD_PCT 150

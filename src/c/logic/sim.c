@@ -14,7 +14,7 @@ bool night_begin(Game *g) {
   memset(g->missiles, 0, sizeof(g->missiles));
   memset(g->effects, 0, sizeof(g->effects));
   memset(&g->stats, 0, sizeof(g->stats));
-  g->wave_len = wave_generate(g->wave, MAX_WAVE, g->night, alive_objects(g), g->seed);
+  g->wave_len = wave_generate(g->wave, MAX_WAVE, g->night, alive_objects(g), (Difficulty)g->difficulty, g->seed);
   g->wave_next = 0; g->night_ms = 0;
   g->air_active = 0; g->air_timer_ms = 0;
   memset(g->ab_cooldown_ms, 0, sizeof(g->ab_cooldown_ms));
