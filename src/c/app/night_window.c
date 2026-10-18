@@ -17,6 +17,9 @@
 #define HUD_H 14
 #define MARK_CONFIRM_PX 20   /* UI tuning: a tap this close to the marker confirms Air Support */
 #define MARK_TTL_MS 3000     /* UI tuning: the marker disappears this long after its last placement */
+#define BANNER_MS 2500       /* "NIGHT N" banner and raid arrows at the start of the night (sim time) */
+#define BLIP_INSET 4         /* spawn blips sit this far inside the screen edge */
+#define BLIP_BLINK_MS 150
 
 static Window *s_window;
 static Layer *s_layer;
@@ -80,6 +83,44 @@ static void prv_draw_mark(GContext *ctx, GPoint p, GColor col) {
   graphics_draw_line(ctx, GPoint(p.x, p.y - 3), GPoint(p.x, p.y + 3));
 }
 
+/* A drone has just crossed the map edge: pulsing red blip there, so a raid that is still out of
+ * sight is never silent. Clamped below the HUD. */
+static void prv_draw_spawn_blips(GContext *ctx, const Game *g, GRect b) {
+  for (int i = 0; i < MAX_EFFECTS; i++) {
+    const Effect *e = &g->effects[i];
+    if (!e->active || e->kind != FX_SPAWN) continue;
+    int el = SPAWN_WARN_MS - (e->ttl_ms < 0 ? 0 : e->ttl_ms);
+    int x = e->a.x / FX, y = e->a.y / FX;
+    x = x < BLIP_INSET ? BLIP_INSET : x > b.size.w - 1 - BLIP_INSET ? b.size.w - 1 - BLIP_INSET : x;
+    y = y < HUD_H + BLIP_INSET ? HUD_H + BLIP_INSET : y > b.size.h - 1 - BLIP_INSET ? b.size.h - 1 - BLIP_INSET : y;
+    GPoint p = GPoint(x, y);
+    graphics_context_set_stroke_color(ctx, GColorRed);
+    graphics_draw_circle(ctx, p, 2 + el * 6 / SPAWN_WARN_MS);   /* expanding ping */
+    if ((el / BLIP_BLINK_MS) % 2 == 0) {
+      graphics_context_set_fill_color(ctx, GColorRed);
+      graphics_fill_circle(ctx, p, 2);
+    }
+  }
+}
+
+/* Start of the night: which night it is and where the drones come from. */
+static void prv_draw_banner(GContext *ctx, const Game *g, GRect b) {
+  render_raid_arrows(ctx, g, GRect(0, HUD_H, b.size.w, b.size.h - HUD_H));
+  GRect box = GRect(30, b.size.h / 3 - 24, b.size.w - 60, 48);
+  graphics_context_set_fill_color(ctx, COL_HUD_BG);
+  graphics_fill_rect(ctx, box, 4, GCornersAll);
+  graphics_context_set_stroke_color(ctx, GColorRed);
+  graphics_draw_round_rect(ctx, box, 4);
+  char buf[16];
+  snprintf(buf, sizeof(buf), "NIGHT %u", (unsigned)g->night);
+  graphics_context_set_text_color(ctx, COL_HUD_TEXT);
+  graphics_draw_text(ctx, buf, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),
+                     GRect(box.origin.x, box.origin.y, box.size.w, 28),
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+  prv_text(ctx, "Drones incoming", GRect(box.origin.x, box.origin.y + 26, box.size.w, 18),
+           GTextAlignmentCenter, GColorRed);
+}
+
 static void prv_draw_pause(GContext *ctx, GRect b) {
   GRect box = GRect(10, b.size.h / 2 - 30, b.size.w - 20, 60);
   graphics_context_set_fill_color(ctx, COL_HUD_BG);
@@ -102,6 +143,8 @@ static void prv_update(Layer *layer, GContext *ctx) {
   render_entities(ctx, g, &s_cam);
   if (g->air_active) prv_draw_mark(ctx, GPoint(g->air_point.x / FX, g->air_point.y / FX), COL_EXPLOSION);
   else if (s_mark && prv_air_available(g)) prv_draw_mark(ctx, s_mark_pt, COL_AIR_MARK);
+  prv_draw_spawn_blips(ctx, g, b);
+  if (g->night_ms < BANNER_MS) prv_draw_banner(ctx, g, b);
   prv_draw_hud(ctx, g, b.size.w);
   if (s_paused) prv_draw_pause(ctx, b);
 }

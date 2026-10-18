@@ -39,6 +39,7 @@ extern const ObjectSpec OBJECT_SPECS[OBJ_COUNT];
 #define WAVE_EXTRA_OBJ_PCT 10
 #define EFFECT_MS 400
 #define IMPACT_MS 600   /* drone hitting the plant or a tower: bigger, longer blast */
+#define SPAWN_WARN_MS 1200   /* edge blip where a drone has just entered the map */
 #define BOUNTY_MS 700   /* floating "+$N" over a downed drone */
 #define TRACER_MS 120
 #define SWARM_INTERVAL_MS 300

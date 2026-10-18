@@ -116,6 +116,7 @@ bool drone_spawn(Game *g, const WaveEntry *e) {
   d.amp = (uint8_t)rng_range(&g->rng, WOBBLE_AMP_MIN, WOBBLE_AMP_MAX);
   d.phase = (uint16_t)rng_range(&g->rng, 0, 65535);
   g->drones[slot] = d;
+  effect_add(g, FX_SPAWN, p, p, SPAWN_WARN_MS);
   return true;
 }
 

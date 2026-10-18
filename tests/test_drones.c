@@ -20,8 +20,10 @@ static void test_object_hit(void) {
   CHECK(g.events & EV_OBJECT_HIT);
   CHECK(g.events & EV_EXPLOSION);
   CHECK_EQ(g.stats.objects_hit, 1);
-  CHECK(g.effects[0].active && g.effects[0].kind == FX_IMPACT);
-  CHECK_EQ(g.effects[0].ttl_ms, IMPACT_MS);
+  CHECK(g.effects[0].active && g.effects[0].kind == FX_SPAWN);   /* edge blip from drone_spawn */
+  CHECK_EQ(g.effects[0].ttl_ms, SPAWN_WARN_MS);
+  CHECK(g.effects[1].active && g.effects[1].kind == FX_IMPACT);
+  CHECK_EQ(g.effects[1].ttl_ms, IMPACT_MS);
 }
 
 static void test_object_destroyed(void) {

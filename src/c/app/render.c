@@ -3,6 +3,7 @@
 #include "../logic/config.h"
 #include "../logic/fx.h"
 #include "../logic/combat.h"
+#include "../logic/waves.h"
 
 #define OBJ_UNITS (OBJECT_CELLS * CELL)
 #define HP_BAR_UNITS 2
@@ -12,9 +13,12 @@
 #define BOUNTY_RISE_UNITS 12
 #define FIRE_FRAME_MS 120    /* flame flicker step at night (the day screen is static) */
 #define SMOKE_FRAME_MS 80
+#define RAID_ARROW_W 14   /* raid direction chevron: base width and depth, px */
+#define RAID_ARROW_D 7
 #define FIRE_HP 66           /* an object at or below this HP burns; at or below FIRE_HP / 2, twice */
 #define MISSILE_UNITS 1
 #define TRAIL_UNITS 6
+#define MISSILE_TRAIL_UNITS 5
 #define AIRSTRIKE_MIN_UNITS 3
 #define SPRITE_GRID 11   /* plant sprites are drawn on an 11x11 grid over the object */
 
@@ -299,33 +303,76 @@ void render_cell_frame(GContext *ctx, const Camera *c, int col, int row, int cel
   graphics_draw_rect(ctx, grect_inset(r, GEdgeInsets(1)));
 }
 
+/* Filled triangle by horizontal spans (no GPath: its fill dropped small triangles on emery). */
+static void prv_fill_tri(GContext *ctx, GPoint a, GPoint b, GPoint c) {
+  GPoint t;
+  if (b.y < a.y) { t = a; a = b; b = t; }
+  if (c.y < a.y) { t = a; a = c; c = t; }
+  if (c.y < b.y) { t = b; b = c; c = t; }
+  if (c.y == a.y) {   /* flat: one span from the leftmost to the rightmost point */
+    int lo = a.x < b.x ? a.x : b.x, hi = a.x < b.x ? b.x : a.x;
+    graphics_draw_line(ctx, GPoint(lo < c.x ? lo : c.x, a.y), GPoint(hi > c.x ? hi : c.x, a.y));
+    return;
+  }
+  for (int y = a.y; y <= c.y; y++) {
+    int xl = a.x + (c.x - a.x) * (y - a.y) / (c.y - a.y);   /* long edge a-c */
+    int xs = y < b.y ? (b.y == a.y ? b.x : a.x + (b.x - a.x) * (y - a.y) / (b.y - a.y))
+                     : (c.y == b.y ? b.x : b.x + (c.x - b.x) * (y - b.y) / (c.y - b.y));
+    graphics_draw_line(ctx, GPoint(xl, y), GPoint(xs, y));
+  }
+}
+
+/* Delta wing pointing along unit heading (hx, hy) in FX: nose `len` px ahead, wingtips `len/2`
+ * behind and `half` px to each side. */
+static void prv_delta(GContext *ctx, GPoint p, int32_t hx, int32_t hy, int len, int half, GColor col) {
+  GPoint nose = GPoint(p.x + (int)(hx * len / FX), p.y + (int)(hy * len / FX));
+  GPoint back = GPoint(p.x - (int)(hx * len / 2 / FX), p.y - (int)(hy * len / 2 / FX));
+  GPoint l = GPoint(back.x - (int)(hy * half / FX), back.y + (int)(hx * half / FX));
+  GPoint r = GPoint(back.x + (int)(hy * half / FX), back.y - (int)(hx * half / FX));
+  graphics_context_set_fill_color(ctx, col);
+  graphics_context_set_stroke_color(ctx, col);
+  prv_fill_tri(ctx, nose, l, r);
+}
+
+/* Each type has its own silhouette, so the raid reads at a glance without sound:
+ * Switchblade a small cross, Shahed-136 a delta, Shahed-238 a bigger delta with a jet flame,
+ * Harpy a long pink dart, identified Gerbera a gray ring (unidentified it passes for a 136). */
 static void prv_drone(GContext *ctx, const Game *g, const Camera *c, int d) {
   const Drone *dr = &g->drones[d];
   int type = dr->type;
   if (type == DR_GERBERA && !drone_identified(g, d)) type = DR_SHAHED136;
   GPoint p = prv_vec(c, dr->pos);
-  int r = (type == DR_SWITCHBLADE ? 1 : 2) * c->zoom;
-  if (c->zoom == 1) r++;   /* night x1: a 1 px radius is a speck */
+  int z = c->zoom;
   if (type == DR_GERBERA) {
     graphics_context_set_stroke_color(ctx, COL_DECOY);
-    graphics_draw_circle(ctx, p, r);
+    graphics_draw_circle(ctx, p, 2 * z + (z == 1));
     return;
   }
-  /* Trail: a short segment behind the drone, opposite to its heading on the track. */
+  /* Heading along the track; trail: a short segment behind the drone. */
   Vec w = dr->wps[dr->wp_idx];
   int32_t dx = w.x - dr->track.x, dy = w.y - dr->track.y;
   int32_t len = fx_dist(dx, dy);
-  if (len > 0) {
-    GPoint t = GPoint(p.x - (int)(dx * TRAIL_UNITS * c->zoom / len),
-                      p.y - (int)(dy * TRAIL_UNITS * c->zoom / len));
-    graphics_context_set_stroke_color(ctx, COL_DRONE_TRAIL);
-    graphics_draw_line(ctx, p, t);
-  }
-  graphics_context_set_fill_color(ctx, COL_DRONE);
-  graphics_fill_circle(ctx, p, r);
-  if (type == DR_SHAHED136 || type == DR_SHAHED238) {   /* delta wing hint */
-    graphics_context_set_stroke_color(ctx, COL_DRONE);
-    graphics_draw_line(ctx, GPoint(p.x - 2 * r, p.y + r), GPoint(p.x + 2 * r, p.y + r));
+  int32_t hx = len > 0 ? dx * FX / len : 0, hy = len > 0 ? dy * FX / len : FX;
+  GPoint t = GPoint(p.x - (int)(hx * TRAIL_UNITS * z / FX), p.y - (int)(hy * TRAIL_UNITS * z / FX));
+  graphics_context_set_stroke_color(ctx, COL_DRONE_TRAIL);
+  graphics_draw_line(ctx, p, t);
+  switch (type) {
+    case DR_SWITCHBLADE:
+      graphics_context_set_stroke_color(ctx, COL_DRONE);
+      graphics_draw_line(ctx, GPoint(p.x - 2 * z, p.y), GPoint(p.x + 2 * z, p.y));
+      graphics_draw_line(ctx, GPoint(p.x, p.y - 2 * z), GPoint(p.x, p.y + 2 * z));
+      break;
+    case DR_HARPY:
+      prv_delta(ctx, p, hx, hy, 7 * z, 3 * z, COL_HARPY);
+      break;
+    case DR_SHAHED238:
+      prv_delta(ctx, p, hx, hy, 6 * z, 4 * z, COL_DRONE);
+      graphics_context_set_fill_color(ctx, COL_MISSILE);   /* jet exhaust */
+      graphics_fill_circle(ctx, GPoint(p.x - (int)(hx * 4 * z / FX), p.y - (int)(hy * 4 * z / FX)), z);
+      break;
+    default:   /* DR_SHAHED136 and unidentified decoys */
+      prv_delta(ctx, p, hx, hy, 5 * z, 3 * z, COL_DRONE);
+      break;
   }
 }
 
@@ -385,10 +432,20 @@ void render_entities(GContext *ctx, const Game *g, const Camera *c) {
   combat_engage_ranges(g, s_ranges);
   for (int d = 0; d < MAX_DRONES; d++)
     if (g->drones[d].active && drone_visible_in(g, d, s_ranges)) prv_drone(ctx, g, c, d);
-  graphics_context_set_fill_color(ctx, COL_MISSILE);
-  for (int m = 0; m < MAX_MISSILES; m++)
-    if (g->missiles[m].active)
-      graphics_fill_circle(ctx, prv_vec(c, g->missiles[m].pos), MISSILE_UNITS * c->zoom);
+  for (int m = 0; m < MAX_MISSILES; m++) {
+    const Missile *ms = &g->missiles[m];
+    if (!ms->active) continue;
+    GPoint p = prv_vec(c, ms->pos);
+    const Drone *dr = &g->drones[ms->drone_idx];
+    int32_t dx = dr->pos.x - ms->pos.x, dy = dr->pos.y - ms->pos.y, len = fx_dist(dx, dy);
+    if (len > 0) {   /* smoke trail behind the warhead, away from its target */
+      graphics_context_set_stroke_color(ctx, COL_MISSILE_TRAIL);
+      graphics_draw_line(ctx, p, GPoint(p.x - (int)(dx * MISSILE_TRAIL_UNITS * c->zoom / len),
+                                        p.y - (int)(dy * MISSILE_TRAIL_UNITS * c->zoom / len)));
+    }
+    graphics_context_set_fill_color(ctx, COL_MISSILE);
+    graphics_fill_circle(ctx, p, MISSILE_UNITS * c->zoom);
+  }
   for (int e = 0; e < MAX_EFFECTS; e++) {
     const Effect *ef = &g->effects[e];
     if (!ef->active) continue;
@@ -396,6 +453,10 @@ void render_entities(GContext *ctx, const Game *g, const Camera *c) {
       case FX_TRACER:
         graphics_context_set_stroke_color(ctx, COL_MISSILE);
         graphics_draw_line(ctx, prv_vec(c, ef->a), prv_vec(c, ef->b));
+        if (ef->ttl_ms * 2 > TRACER_MS) {   /* muzzle flash for the first half of the tracer */
+          graphics_context_set_fill_color(ctx, GColorWhite);
+          graphics_fill_circle(ctx, prv_vec(c, ef->a), c->zoom + 1);
+        }
         break;
       case FX_AIRSTRIKE: {   /* ring expanding to AIR_RADIUS over the effect's lifetime */
         int ttl = ef->ttl_ms < 0 ? 0 : ef->ttl_ms;
@@ -411,6 +472,8 @@ void render_entities(GContext *ctx, const Game *g, const Camera *c) {
         break;
       case FX_BOUNTY:
         break;   /* text goes on top of everything, below */
+      case FX_SPAWN:
+        break;   /* edge blips are the night screen's: it knows where its HUD is */
       default:   /* FX_EXPLOSION */
         prv_blast(ctx, prv_vec(c, ef->a), ef->ttl_ms, EFFECT_MS, EXPLOSION_UNITS * c->zoom, 4);
         break;
@@ -418,4 +481,31 @@ void render_entities(GContext *ctx, const Game *g, const Camera *c) {
   }
   for (int e = 0; e < MAX_EFFECTS; e++)
     if (g->effects[e].active && g->effects[e].kind == FX_BOUNTY) prv_bounty(ctx, c, &g->effects[e]);
+}
+
+/* Inward-pointing chevron pair on edge `side` (0 top, 1 right, 2 bottom, 3 left) of rect `r`. */
+static void prv_raid_arrow(GContext *ctx, GRect r, int side) {
+  static const int8_t IN[4][2] = {{0, 1}, {-1, 0}, {0, -1}, {1, 0}};   /* inward unit vector */
+  int ix = IN[side][0], iy = IN[side][1];
+  int cx = r.origin.x + r.size.w / 2, cy = r.origin.y + r.size.h / 2;
+  GPoint edge = side == 0 ? GPoint(cx, r.origin.y + 2) : side == 1 ? GPoint(r.origin.x + r.size.w - 3, cy)
+              : side == 2 ? GPoint(cx, r.origin.y + r.size.h - 3) : GPoint(r.origin.x + 2, cy);
+  graphics_context_set_fill_color(ctx, GColorRed);
+  graphics_context_set_stroke_color(ctx, GColorBlack);
+  for (int k = 0; k < 2; k++) {
+    GPoint b = GPoint(edge.x + ix * k * (RAID_ARROW_D - 1), edge.y + iy * k * (RAID_ARROW_D - 1));
+    int hw = RAID_ARROW_W / 2;
+    GPoint pts[3] = {GPoint(b.x - iy * hw, b.y - ix * hw), GPoint(b.x + iy * hw, b.y + ix * hw),
+                     GPoint(b.x + ix * RAID_ARROW_D, b.y + iy * RAID_ARROW_D)};
+    GPath path = {3, pts, 0, GPointZero};
+    gpath_draw_filled(ctx, &path);
+    gpath_draw_outline(ctx, &path);
+  }
+}
+
+/* Where tonight's drones come from: the same sides night_begin will generate. */
+void render_raid_arrows(GContext *ctx, const Game *g, GRect r) {
+  uint8_t sides[4];
+  int n = wave_sides(g->night, g->seed, sides);
+  for (int i = 0; i < n; i++) prv_raid_arrow(ctx, r, sides[i]);
 }

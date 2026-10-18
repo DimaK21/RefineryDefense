@@ -13,5 +13,7 @@ void render_entities(GContext *ctx, const Game *g, const Camera *c);
 void render_tower_icon(GContext *ctx, int type, GRect r);
 /* Translucent-looking ghost of a tower with its range circle at a cell. */
 void render_ghost(GContext *ctx, const Camera *c, int type, int col, int row);
+/* Chevrons on the edges of screen rect `r` that tonight's drones come from (see wave_sides). */
+void render_raid_arrows(GContext *ctx, const Game *g, GRect r);
 /* Highlight frame around a world rect given in cells. */
 void render_cell_frame(GContext *ctx, const Camera *c, int col, int row, int cells);

@@ -26,6 +26,8 @@
 #define COL_MISSILE     GColorYellow
 #define COL_EXPLOSION   GColorOrange
 #define COL_DRONE_TRAIL GColorDarkCandyAppleRed
+#define COL_HARPY       GColorShockingPink
+#define COL_MISSILE_TRAIL GColorLightGray
 #define COL_AIR_MARK    GColorWhite
 #define COL_MINIMAP_BG  GColorDarkGreen
 #define COL_VIEW_FRAME  GColorWhite

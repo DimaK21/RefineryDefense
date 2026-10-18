@@ -20,7 +20,7 @@ typedef enum { OBJ_DISTILLATION, OBJ_TANK_A, OBJ_TANK_B, OBJ_TERMINAL, OBJ_CRACK
 typedef enum { OBJ_NOT_BUILT, OBJ_ALIVE, OBJ_DESTROYED } ObjectStatus;
 typedef enum { PHASE_DAY, PHASE_NIGHT, PHASE_REPORT, PHASE_GAME_OVER } Phase;
 typedef enum { TGT_OBJECT, TGT_TOWER } TargetKind;
-typedef enum { FX_EXPLOSION, FX_TRACER, FX_AIRSTRIKE, FX_IMPACT, FX_BOUNTY } EffectKind;
+typedef enum { FX_EXPLOSION, FX_TRACER, FX_AIRSTRIKE, FX_IMPACT, FX_BOUNTY, FX_SPAWN } EffectKind;
 
 typedef struct { int32_t x, y; } Vec;                          // Q8 world units
 typedef struct { uint8_t active, type, col, row, hp, ammo; int16_t cooldown_ms; } Tower;
