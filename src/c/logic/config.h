@@ -24,7 +24,7 @@ extern const DroneSpec DRONE_SPECS[DR_COUNT];
 extern const ObjectSpec OBJECT_SPECS[OBJ_COUNT];
 extern const AbilitySpec ABILITY_SPECS[AB_COUNT];
 
-#define START_MONEY 400
+#define START_MONEY 500   /* $400 bought radar + 4 shooters with $0 left: early leaks snowballed (test_balance.c) */
 #define SELL_REFUND_PCT 50
 #define TOWER_REPAIR_PCT 30
 #define REBUILD_PCT 150

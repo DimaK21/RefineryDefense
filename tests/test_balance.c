@@ -6,7 +6,25 @@
 #include "combat.h"
 #include "fx.h"
 
-#define SEEDS 20
+/* Balance criteria (bot = bot_morning + bot_night below, seeds 1..SEEDS):
+ * The bot's outcome is bimodal: a seed either loses around nights 4-8 (an early leak costs repairs and
+ * missile reloads, the defence stops growing, Harpies take out the radar, then Shahed-238 from four
+ * sides on night 6 finishes it) or snowballs to the wall at nights 16-21, where the bot runs out of
+ * ring cells and Shahed-238 waves outgrow a fixed defence. A median of 20 seeds sat in the gap
+ * between the modes and flipped on tiny changes, so the checks below look at robust statistics:
+ *   - mean nights in [BAL_MEAN_MIN, BAL_MEAN_MAX]: overall difficulty (the upper bound is the wall);
+ *   - lower quartile >= BAL_Q1_MIN: at least 3/4 of seeds survive past the night-6 step;
+ *   - at most BAL_EARLY_MAX seeds lost on night BAL_EARLY_NIGHT or earlier: early nights must not
+ *     hinge on the seed (raid side vs. where the bot happens to put its towers);
+ *   - no seed reaches MAX_NIGHTS, and an idle player (no towers, no abilities) loses on nights 1-3.
+ * Reference with START_MONEY 500 over 1000 seeds: mean 15.6, Q1 14, median 18, 1.2% lost by night 5.
+ * At START_MONEY 400 it was mean 8.3, Q1 5, median 6, 12.8% lost by night 5. */
+#define SEEDS 60
+#define BAL_MEAN_MIN 11
+#define BAL_MEAN_MAX 20
+#define BAL_Q1_MIN 6
+#define BAL_EARLY_NIGHT 5
+#define BAL_EARLY_MAX (SEEDS / 20)   /* 5% */
 #define MAX_NIGHTS 60
 #define TICKS_CAP 5000
 #define BOT_REACT_TICKS 10   /* the night bot looks at the sky every 400 ms, like a player */
@@ -108,22 +126,30 @@ static int run(uint32_t seed, int smart, int *lost_night) {
 }
 
 static void test_balance(void) {
-  int smart[SEEDS], idle[SEEDS], lost;
-  int idle_ok = 1;
+  int smart[SEEDS], lost;
+  int idle_ok = 1, idle_worst = 0, early = 0, capped = 0, sum = 0;
   for (int s = 0; s < SEEDS; s++) {
     smart[s] = run((uint32_t)(s + 1), 1, &lost);
-    idle[s] = run((uint32_t)(s + 1), 0, &lost);
+    if (lost && lost <= BAL_EARLY_NIGHT) early++;
+    capped += smart[s] >= MAX_NIGHTS;
+    sum += smart[s];
+    run((uint32_t)(s + 1), 0, &lost);
     if (!(lost >= 1 && lost <= 3)) idle_ok = 0;
-    printf("seed %2d: bot %2d nights, idle %2d nights (idle lost night %d)\n", s + 1, smart[s], idle[s], lost);
+    if (lost > idle_worst) idle_worst = lost;
   }
+  printf("bot nights by seed:");
+  for (int s = 0; s < SEEDS; s++) printf("%s%2d", s % 20 ? " " : "\n  ", smart[s]);
   int sorted[SEEDS]; for (int s = 0; s < SEEDS; s++) sorted[s] = smart[s];
   qsort(sorted, SEEDS, sizeof(int), cmp_int);
-  int median = sorted[SEEDS / 2];                  /* upper median: sorted[10] */
-  printf("bot median (sorted[10]) = %d, min %d, max %d\n", median, sorted[0], sorted[SEEDS - 1]);
-  int capped = 0; for (int s = 0; s < SEEDS; s++) capped += smart[s] >= MAX_NIGHTS;
-  printf("seeds reaching the %d-night cap: %d\n", MAX_NIGHTS, capped);
-  CHECK(median >= 7);
-  CHECK(median <= 15);
+  int q1 = sorted[SEEDS / 4];
+  printf("\nbot mean %.2f, min %d, Q1 %d, median %d, Q3 %d, max %d\n", (double)sum / SEEDS, sorted[0], q1,
+         sorted[SEEDS / 2], sorted[3 * SEEDS / 4], sorted[SEEDS - 1]);
+  printf("lost by night %d: %d of %d; reached the %d-night cap: %d; idle lost by night %d at the latest\n",
+         BAL_EARLY_NIGHT, early, SEEDS, MAX_NIGHTS, capped, idle_worst);
+  CHECK(sum >= BAL_MEAN_MIN * SEEDS);
+  CHECK(sum <= BAL_MEAN_MAX * SEEDS);
+  CHECK(q1 >= BAL_Q1_MIN);
+  CHECK(early <= BAL_EARLY_MAX);
   CHECK(capped == 0);
   CHECK(idle_ok);
 }
