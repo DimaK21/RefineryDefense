@@ -197,5 +197,26 @@ test('separators in names become spaces', function () {
   assert.deepStrictEqual(r.rows, ['1|A B|3|3', '2|C D|2|2']);
 });
 
+test('player with no score yet: member 404 means no own row', function () {
+  var http = fakeHttp(baseRoutes({
+    'GET /leaderboards/normal/member/777': function () { return [404, { message: 'not found' }]; }
+  }));
+  var r = sync(function (cb) { client(http).table(1, 'DIM', cb); });
+  assert.strictEqual(r.status, 0);
+  assert.strictEqual(r.me, '');
+  assert.strictEqual(r.rows.length, 10);
+});
+
+test('names from the server are cut to the watch alphabet and 6 characters', function () {
+  var long = 'Ünïcode-NAME-way-too-long-' + new Array(100).join('x');
+  var http = fakeHttp(baseRoutes({
+    'GET /leaderboards/normal/list': function () {
+      return [200, { items: [item(1, long, 3, 3), item(2, 'ab|c', 2, 2)], pagination: { total: 2 } }];
+    }
+  }));
+  var r = sync(function (cb) { client(http).table(1, 'DIM', cb); });
+  assert.deepStrictEqual(r.rows, ['1|N CODE|3|3', '2|AB C|2|2']);
+});
+
 console.log(passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

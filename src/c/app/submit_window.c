@@ -95,16 +95,22 @@ static void prv_load(Window *w) {
   layer_set_update_proc(s_layer, prv_update);
   layer_add_child(root, s_layer);
   s_state = ST_SENDING;
-  s_down = false;
   char name[NAME_LEN + 1];
   storage_name(name);
   net_request_submit(s_diff, s_best, name, prv_sent);
+}
+
+/* Touch follows visibility, like the other screens: no reliance on the order in which the
+ * window below disappears and this one loads. */
+static void prv_appear(Window *w) {
+  s_down = false;
   touch_service_subscribe(prv_touch, NULL);
 }
 
+static void prv_disappear(Window *w) { touch_service_unsubscribe(); }
+
 static void prv_unload(Window *w) {
   net_cancel();
-  touch_service_unsubscribe();
   layer_destroy(s_layer);
   s_layer = NULL;
 }
@@ -117,7 +123,8 @@ void submit_window_push(Difficulty d, Best b) {
     window_set_background_color(s_window, UI_BG);
     window_set_touch_bridge_disabled(s_window, true);
     window_set_click_config_provider(s_window, prv_clicks);
-    window_set_window_handlers(s_window, (WindowHandlers){ .load = prv_load, .unload = prv_unload });
+    window_set_window_handlers(s_window, (WindowHandlers){
+      .load = prv_load, .appear = prv_appear, .disappear = prv_disappear, .unload = prv_unload });
   }
   window_stack_push(s_window, true);
 }

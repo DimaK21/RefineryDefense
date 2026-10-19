@@ -59,9 +59,14 @@ function reply(seq, r) {
 }
 
 // Local only: tells the watch it can send requests now. No network here.
-Pebble.addEventListener('ready', function () {
-  Pebble.sendAppMessage({ READY: 1 });
-});
+// Retried a few times: the watch holds every request until READY arrives.
+var READY_TRIES = 5, READY_RETRY_MS = 1000;
+function sendReady(left) {
+  Pebble.sendAppMessage({ READY: 1 }, null, function () {
+    if (left > 1) setTimeout(function () { sendReady(left - 1); }, READY_RETRY_MS);
+  });
+}
+Pebble.addEventListener('ready', function () { sendReady(READY_TRIES); });
 
 Pebble.addEventListener('appmessage', function (e) {
   var p = e.payload, seq = p.SEQ, name = p.NAME || '';

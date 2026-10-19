@@ -11,7 +11,11 @@ var AROUND = 2;   // rows above and below the player after a submit
 function pack(nights, score) { return nights * 1000000 + Math.min(score, SCORE_CAP); }
 function unpack(n) { return { nights: Math.floor(n / 1000000), score: n % 1000000 }; }
 
-function cleanName(s) { return String(s || '').replace(/[|\r\n]/g, ' '); }
+// Only what the watch can draw and store: A-Z, 0-9, space, at most 6. Anything else becomes a
+// space, so a hostile or foreign name can neither break the row format nor overflow the inbox.
+function cleanName(s) {
+  return String(s || '').toUpperCase().replace(/[^A-Z0-9 ]/g, ' ').trim().slice(0, 6).trim();
+}
 function row(it) {
   var b = unpack(it.score || 0);
   return it.rank + '|' + cleanName(it.player && it.player.name) + '|' + b.nights + '|' + b.score;
@@ -34,7 +38,8 @@ function createClient(opts) {
   }
 
   // One authenticated request; a 401 logs in again and retries once. cb(status, json)
-  function call(method, path, body, cb) {
+  // `empty` lists HTTP codes that count as success with no body.
+  function call(method, path, body, cb, empty) {
     var relogged = false;
     function attempt() {
       var headers = { 'Content-Type': 'application/json', 'LL-Version': '2021-03-01',
@@ -45,6 +50,7 @@ function createClient(opts) {
           relogged = true;
           return login(function (s) { return s ? cb(s) : attempt(); });
         }
+        if (empty && empty.indexOf(status) >= 0) return cb(0, {});
         if (status < 200 || status >= 300) return cb(2);
         cb(0, json || {});
       });
@@ -67,8 +73,9 @@ function createClient(opts) {
     });
   }
 
+  // A player who never sent may come back as 404 instead of rank 0: both mean "not on the board".
   function member(key, cb) {
-    call('GET', '/leaderboards/' + key + '/member/' + store.getItem('ll_player_id'), null, cb);
+    call('GET', '/leaderboards/' + key + '/member/' + store.getItem('ll_player_id'), null, cb, [404]);
   }
 
   function total(list) { return (list.pagination && list.pagination.total) || 0; }
@@ -83,7 +90,7 @@ function createClient(opts) {
         member(key, function (s, me) {
           if (s) return cb({ status: s });
           cb({ status: 0, total: total(list), rows: (list.items || []).map(row),
-               me: me.rank > 0 ? row(me) : '' });
+               me: me && me.rank > 0 ? row(me) : '' });
         });
       });
     });
