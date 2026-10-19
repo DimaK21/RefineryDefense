@@ -8,7 +8,7 @@ BINS = $(TESTS:.c=.bin)
 test: $(BINS)
 	@set -e; for b in $(BINS); do echo "== $$b"; ./$$b; done
 
-%.bin: %.c $(LOGIC) $(wildcard ../src/c/logic/*.h) test.h
+%.bin: %.c $(LOGIC) $(wildcard ../src/c/logic/*.h) ../src/c/app/persist_keys.h test.h
 	$(CC) $(CFLAGS) -o $@ $< $(LOGIC)
 
 bench: bench.c $(LOGIC) $(wildcard ../src/c/logic/*.h)

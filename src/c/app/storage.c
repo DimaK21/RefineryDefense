@@ -1,10 +1,5 @@
 #include "storage.h"
-
-#define KEY_OLD_HDR 1      /* pre-single-key layout: deleted on save */
-#define KEY_OLD_TOWERS 2
-#define KEY_OLD_BEST 3     /* one record from before difficulties: becomes Normal's */
-#define KEY_SAVE 4         /* header + towers in one key: written atomically */
-#define KEY_BESTS 5        /* Best per difficulty */
+#include "persist_keys.h"
 
 _Static_assert(SAVE_LEN <= PERSIST_DATA_MAX_LENGTH, "save must fit one persist key");
 

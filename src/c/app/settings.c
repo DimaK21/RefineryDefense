@@ -1,8 +1,6 @@
 #include <pebble.h>
 #include "settings.h"
-
-#define KEY_SOUND 5   /* keys 1-4 belong to storage.c */
-#define KEY_VIBE 6
+#include "persist_keys.h"
 
 static bool s_sound = false;
 static bool s_vibe = true;
