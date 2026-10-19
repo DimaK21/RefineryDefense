@@ -9,6 +9,7 @@
 #include "settings.h"
 #include "settings_window.h"
 #include "help_window.h"
+#include "net.h"
 
 static Game s_game;
 
@@ -22,6 +23,7 @@ void app_go_gameover(void) { window_stack_pop_all(false); gameover_window_push()
 
 int main(void) {
   settings_load();
+  net_init();
   if (touch_service_is_enabled()) {
     menu_window_push();
   } else {

@@ -58,6 +58,11 @@ function reply(seq, r) {
   Pebble.sendAppMessage(msg, null, function () { console.log('leaderboard reply not delivered'); });
 }
 
+// Local only: tells the watch it can send requests now. No network here.
+Pebble.addEventListener('ready', function () {
+  Pebble.sendAppMessage({ READY: 1 });
+});
+
 Pebble.addEventListener('appmessage', function (e) {
   var p = e.payload, seq = p.SEQ, name = p.NAME || '';
   var done = function (r) { reply(seq, r); };

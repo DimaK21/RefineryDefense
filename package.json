@@ -31,7 +31,8 @@
       "ROWS",
       "ME",
       "ON_NIGHTS",
-      "ON_SCORE"
+      "ON_SCORE",
+      "READY"
     ],
     "resources": {
       "media": [
