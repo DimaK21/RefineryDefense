@@ -1,6 +1,7 @@
 #include "app.h"
 #include "menu_window.h"
 #include "settings_window.h"
+#include "leaders_window.h"
 #include "storage.h"
 #include "ui.h"
 #include "ui_colors.h"
@@ -9,16 +10,17 @@
 #include "../logic/sim.h"
 
 #define BTN_W 160
-#define BTN_H 28
-#define BTN_GAP 5
+#define BTN_H 26
+#define BTN_GAP 4
+#define BTN_MAX 4   /* Continue, New Game, Leaders, Settings */
 #define BTN_TOP 70
 #define NEW_CONFIRM_MS 2500   /* UI tuning: a second New Game within this overwrites the save */
 
-typedef enum { ITEM_CONTINUE, ITEM_NEW, ITEM_SETTINGS } Item;
+typedef enum { ITEM_CONTINUE, ITEM_NEW, ITEM_LEADERS, ITEM_SETTINGS } Item;
 
 static Window *s_window;
 static Layer *s_layer;
-static Item s_items[3];
+static Item s_items[BTN_MAX];
 static int s_count;
 static int s_sel;
 static int s_pressed = -1;   /* button under the finger since touchdown */
@@ -59,6 +61,7 @@ static void prv_refresh(void) {
                DIFFICULTY_SPECS[storage_saved_difficulty()].name);
     }
     s_items[s_count++] = ITEM_NEW;
+    s_items[s_count++] = ITEM_LEADERS;
     s_items[s_count++] = ITEM_SETTINGS;
   }
   if (s_sel >= s_count) s_sel = 0;
@@ -75,7 +78,7 @@ static void prv_set_picking(bool on) {
 }
 
 static GRect prv_btn_rect(GRect b, int i) {
-  int top = BTN_TOP + (3 - s_count) * (BTN_H + BTN_GAP) / 2;   /* both lists have at most 3 */
+  int top = BTN_TOP + (BTN_MAX - s_count) * (BTN_H + BTN_GAP) / 2;
   return GRect((b.size.w - BTN_W) / 2, top + i * (BTN_H + BTN_GAP), BTN_W, BTN_H);
 }
 
@@ -108,10 +111,11 @@ static void prv_update(Layer *layer, GContext *ctx) {
     bool armed = s_items[i] == ITEM_NEW && s_new_armed;
     const char *label = s_items[i] == ITEM_CONTINUE ? s_continue
                       : s_items[i] == ITEM_SETTINGS ? "Settings"
+                      : s_items[i] == ITEM_LEADERS ? "Leaders"
                       : armed ? "Overwrite save?" : "New Game";
     ui_button(ctx, prv_btn_rect(b, i), label, i == s_sel, armed);
   }
-  ui_text(ctx, s_best, FONT_KEY_GOTHIC_14_BOLD, GRect(0, BTN_TOP + 3 * (BTN_H + BTN_GAP) - 2, b.size.w, 18),
+  ui_text(ctx, s_best, FONT_KEY_GOTHIC_14_BOLD, GRect(0, BTN_TOP + BTN_MAX * (BTN_H + BTN_GAP) - 1, b.size.w, 18),
           GTextAlignmentCenter, UI_MUTED);
 }
 
@@ -163,6 +167,9 @@ static void prv_activate(int i) {
   switch (s_items[i]) {
     case ITEM_CONTINUE: prv_continue(); break;
     case ITEM_NEW:      prv_new_game(); break;
+    case ITEM_LEADERS:
+      leaders_window_push(storage_exists() ? storage_saved_difficulty() : s_last_diff);
+      break;
     case ITEM_SETTINGS: settings_window_push(); break;
   }
 }
@@ -192,7 +199,7 @@ static void prv_clicks(void *ctx) {
 }
 
 static int prv_button_at(int16_t x, int16_t y) {
-  GRect b = layer_get_bounds(s_layer), rects[3];
+  GRect b = layer_get_bounds(s_layer), rects[BTN_MAX];
   for (int i = 0; i < s_count; i++) rects[i] = prv_btn_rect(b, i);
   return ui_hit(rects, s_count, GPoint(x, y));
 }
