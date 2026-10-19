@@ -10,6 +10,7 @@
 
 #define ROW_H 16
 #define LIST_TOP (UI_HEADER_H + 6)
+#define LIST_X (4 + UI_ROUND_INSET)
 #define LIST_ROWS 8          /* visible rows; one fewer when the unsent-best line shows */
 #define LONG_MS 500          /* UI tuning: Select held this long sends */
 #define MAX_ENTRIES (BOARD_MAX_ROWS + 1)   /* top rows + the player's row under a gap */
@@ -53,15 +54,15 @@ static void prv_update(Layer *layer, GContext *ctx) {
     ui_text(ctx, msg, FONT_KEY_GOTHIC_18_BOLD, GRect(10, 90, w - 20, 48), GTextAlignmentCenter,
             s_state == ST_ERROR ? UI_BAD : UI_TEXT);
   } else {
-    ui_board_header(ctx, GRect(4, LIST_TOP, w - 8, ROW_H));
+    ui_board_header(ctx, GRect(LIST_X, LIST_TOP, w - 2 * LIST_X, ROW_H));
     int vis = prv_visible();
     for (int i = 0; i < vis && s_scroll + i < s_n; i++) {
       int idx = s_scroll + i, y = LIST_TOP + ROW_H + i * ROW_H;
       if (idx == s_gap_before) {   /* dotted rule: the player's row is not next to the one above */
         graphics_context_set_stroke_color(ctx, UI_MUTED);
-        for (int x = 8; x < w - 8; x += 4) graphics_draw_pixel(ctx, GPoint(x, y));
+        for (int x = LIST_X + 4; x < w - LIST_X - 4; x += 4) graphics_draw_pixel(ctx, GPoint(x, y));
       }
-      ui_board_row(ctx, GRect(4, y, w - 8, ROW_H), &s_entries[idx],
+      ui_board_row(ctx, GRect(LIST_X, y, w - 2 * LIST_X, ROW_H), &s_entries[idx],
                    s_my_rank && s_entries[idx].rank == s_my_rank);
     }
     if (s_scroll + vis < s_n) {   /* more below */

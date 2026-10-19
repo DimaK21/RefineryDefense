@@ -19,11 +19,12 @@ void ui_header(GContext *ctx, GRect bounds, GColor band, const char *kicker, con
   graphics_fill_rect(ctx, GRect(0, 0, w, UI_HEADER_H), 0, GCornerNone);
   graphics_context_set_fill_color(ctx, UI_ACCENT);
   graphics_fill_rect(ctx, GRect(0, UI_HEADER_H, w, 2), 0, GCornerNone);
+  int y = UI_HEADER_H - 44;   /* round: the text sits lower, where the circle is wider */
   if (kicker) {
-    ui_text(ctx, kicker, FONT_KEY_GOTHIC_14_BOLD, GRect(0, 1, w, 16), GTextAlignmentCenter, UI_TEXT);
-    ui_text(ctx, title, FONT_KEY_GOTHIC_24_BOLD, GRect(0, 12, w, 28), GTextAlignmentCenter, UI_TEXT);
+    ui_text(ctx, kicker, FONT_KEY_GOTHIC_14_BOLD, GRect(0, y + 1, w, 16), GTextAlignmentCenter, UI_TEXT);
+    ui_text(ctx, title, FONT_KEY_GOTHIC_24_BOLD, GRect(0, y + 12, w, 28), GTextAlignmentCenter, UI_TEXT);
   } else {
-    ui_text(ctx, title, FONT_KEY_GOTHIC_28_BOLD, GRect(0, 4, w, 32), GTextAlignmentCenter, UI_TEXT);
+    ui_text(ctx, title, FONT_KEY_GOTHIC_28_BOLD, GRect(0, y + 4, w, 32), GTextAlignmentCenter, UI_TEXT);
   }
 }
 
@@ -64,6 +65,9 @@ void ui_stat_row(GContext *ctx, GRect r, const char *label, const char *value, G
 
 /* ---- title art ---- */
 
+#define SKYLINE_W 200
+#define GROUND_LIFT PBL_IF_ROUND_ELSE(12, 0)   /* round: the skyline stands above the bottom of the circle */
+
 static const GPoint STARS[] = {
   {14, 10}, {38, 30}, {61, 6}, {88, 22}, {120, 8}, {146, 28}, {171, 12}, {190, 34},
   {8, 52}, {176, 58}, {26, 74}, {192, 82}, {104, 64}, {52, 96}, {150, 100},
@@ -75,34 +79,35 @@ static void prv_rings(GContext *ctx, int x, int w, int top, int bottom) {
 }
 
 void ui_skyline(GContext *ctx, GRect b) {
-  int w = b.size.w, g = b.origin.y + b.size.h;   /* g: ground line */
+  int w = b.size.w, g = b.origin.y + b.size.h - GROUND_LIFT;   /* g: ground line */
+  int x = b.origin.x + (w - SKYLINE_W) / 2;        /* the art is SKYLINE_W wide, centred */
   graphics_context_set_stroke_color(ctx, UI_MUTED);
   for (size_t i = 0; i < ARRAY_LENGTH(STARS); i++)
-    if (STARS[i].y < b.size.h - 50) graphics_draw_pixel(ctx, GPoint(STARS[i].x, b.origin.y + STARS[i].y));
+    if (STARS[i].y < b.size.h - GROUND_LIFT - 50) graphics_draw_pixel(ctx, GPoint(x + STARS[i].x, b.origin.y + STARS[i].y));
 
   graphics_context_set_fill_color(ctx, UI_SILHOUETTE);
-  graphics_fill_rect(ctx, GRect(0, g - 5, w, 5), 0, GCornerNone);
-  graphics_fill_rect(ctx, GRect(6, g - 20, 28, 16), 3, GCornersTop);       /* tank farm */
-  graphics_fill_rect(ctx, GRect(36, g - 14, 20, 10), 3, GCornersTop);
-  graphics_fill_rect(ctx, GRect(64, g - 48, 9, 44), 2, GCornersTop);       /* distillation columns */
-  graphics_fill_rect(ctx, GRect(76, g - 36, 7, 32), 2, GCornersTop);
-  prv_rings(ctx, 64, 9, g - 48, g - 4);
-  prv_rings(ctx, 76, 7, g - 36, g - 4);
-  graphics_fill_rect(ctx, GRect(86, g - 18, 36, 14), 0, GCornerNone);      /* cracking unit */
-  graphics_fill_rect(ctx, GRect(110, g - 28, 6, 10), 0, GCornerNone);
-  graphics_fill_rect(ctx, GRect(132, g - 44, 3, 40), 0, GCornerNone);      /* flare stack */
-  graphics_fill_circle(ctx, GPoint(158, g - 17), 10);                      /* spherical tank */
-  graphics_fill_rect(ctx, GRect(150, g - 10, 2, 6), 0, GCornerNone);
-  graphics_fill_rect(ctx, GRect(164, g - 10, 2, 6), 0, GCornerNone);
-  graphics_fill_rect(ctx, GRect(174, g - 16, 22, 12), 3, GCornersTop);
+  graphics_fill_rect(ctx, GRect(b.origin.x, g - 5, w, 5 + GROUND_LIFT), 0, GCornerNone);
+  graphics_fill_rect(ctx, GRect(x + 6, g - 20, 28, 16), 3, GCornersTop);       /* tank farm */
+  graphics_fill_rect(ctx, GRect(x + 36, g - 14, 20, 10), 3, GCornersTop);
+  graphics_fill_rect(ctx, GRect(x + 64, g - 48, 9, 44), 2, GCornersTop);       /* distillation columns */
+  graphics_fill_rect(ctx, GRect(x + 76, g - 36, 7, 32), 2, GCornersTop);
+  prv_rings(ctx, x + 64, 9, g - 48, g - 4);
+  prv_rings(ctx, x + 76, 7, g - 36, g - 4);
+  graphics_fill_rect(ctx, GRect(x + 86, g - 18, 36, 14), 0, GCornerNone);      /* cracking unit */
+  graphics_fill_rect(ctx, GRect(x + 110, g - 28, 6, 10), 0, GCornerNone);
+  graphics_fill_rect(ctx, GRect(x + 132, g - 44, 3, 40), 0, GCornerNone);      /* flare stack */
+  graphics_fill_circle(ctx, GPoint(x + 158, g - 17), 10);                      /* spherical tank */
+  graphics_fill_rect(ctx, GRect(x + 150, g - 10, 2, 6), 0, GCornerNone);
+  graphics_fill_rect(ctx, GRect(x + 164, g - 10, 2, 6), 0, GCornerNone);
+  graphics_fill_rect(ctx, GRect(x + 174, g - 16, 22, 12), 3, GCornersTop);
   graphics_context_set_stroke_color(ctx, UI_SILHOUETTE);                   /* pipe rack */
-  graphics_draw_line(ctx, GPoint(34, g - 9), GPoint(64, g - 9));
-  graphics_draw_line(ctx, GPoint(122, g - 12), GPoint(148, g - 12));
+  graphics_draw_line(ctx, GPoint(x + 34, g - 9), GPoint(x + 64, g - 9));
+  graphics_draw_line(ctx, GPoint(x + 122, g - 12), GPoint(x + 148, g - 12));
 
   graphics_context_set_fill_color(ctx, UI_FLAME);
-  graphics_fill_circle(ctx, GPoint(133, g - 48), 3);
+  graphics_fill_circle(ctx, GPoint(x + 133, g - 48), 3);
   graphics_context_set_fill_color(ctx, UI_ACCENT);
-  graphics_fill_circle(ctx, GPoint(133, g - 47), 1);
+  graphics_fill_circle(ctx, GPoint(x + 133, g - 47), 1);
 }
 
 int ui_hit(const GRect *rects, int n, GPoint p) {

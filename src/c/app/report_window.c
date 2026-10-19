@@ -16,7 +16,7 @@ static Layer *s_layer;
 
 #define ROW_H 21
 #define ROWS 6
-#define ROW_MARGIN 12
+#define ROW_MARGIN (12 + UI_ROUND_INSET)
 
 static void prv_ack(void) {
   Game *g = app_game();

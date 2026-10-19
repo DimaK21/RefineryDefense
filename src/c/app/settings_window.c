@@ -10,7 +10,7 @@
 
 #define ROW_H 34
 #define ROW_GAP 4
-#define ROW_MARGIN 8
+#define ROW_MARGIN (8 + UI_ROUND_INSET)
 #define TOGGLE_W 38
 #define TOGGLE_H 20
 

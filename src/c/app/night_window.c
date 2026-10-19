@@ -15,7 +15,13 @@
 
 #define TICK_MS 40
 #define MAX_CATCHUP_MS 200   /* real ms simulated per callback at most: a stall must not teleport drones */
+#ifdef PBL_ROUND
+#define HUD_H 38             /* two rows, low enough for the circle to be wide there */
+#define BOX_MARGIN 24        /* banner side margin: its corners stay inside the circle */
+#else
 #define HUD_H 14
+#define BOX_MARGIN 10
+#endif
 #define MARK_CONFIRM_PX 20   /* UI tuning: a tap this close to the marker uses the ability */
 #define MARK_TTL_MS 3000     /* UI tuning: the marker disappears this long after its last placement */
 #define BANNER_MS 2500       /* "NIGHT N" banner and raid arrows at the start of the night (sim time) */
@@ -29,7 +35,7 @@
 static Window *s_window;
 static Layer *s_layer;
 static AppTimer *s_timer;
-static const Camera s_cam = {0, 0, 1};
+static Camera s_cam;          /* 1:1, the world centred on the screen (offset 0 on a 200x228 screen) */
 static GestureTracker s_gt;
 static TouchClock s_clock;
 static uint32_t s_last_ms;
@@ -105,13 +111,12 @@ static void prv_ability_icon(GContext *ctx, Ability a, GPoint c, GColor col) {
 static unsigned prv_secs(uint16_t ms) { return (ms + 999) / 1000; }
 
 /* Selected ability by name: yellow when it can be used now, gray otherwise; seconds left on cooldown. */
-static void prv_draw_ability(GContext *ctx, const Game *g) {
+static void prv_draw_ability(GContext *ctx, const Game *g, GRect r) {
   uint16_t cd = g->ab_cooldown_ms[s_ability];
   char buf[12];
   if (cd > 0) snprintf(buf, sizeof(buf), "%s %u", AB_SHORT[s_ability], prv_secs(cd));
   else snprintf(buf, sizeof(buf), "%s", AB_SHORT[s_ability]);
-  prv_text(ctx, buf, GRect(AB_HUD_X, -3, AB_HUD_W, HUD_H + 4), GTextAlignmentCenter,
-           ability_ready(g, s_ability) ? COL_SELECT : COL_DISABLED);
+  prv_text(ctx, buf, r, GTextAlignmentCenter, ability_ready(g, s_ability) ? COL_SELECT : COL_DISABLED);
 }
 
 static void prv_draw_hud(GContext *ctx, const Game *g, int w) {
@@ -119,15 +124,27 @@ static void prv_draw_hud(GContext *ctx, const Game *g, int w) {
   graphics_context_set_stroke_color(ctx, COL_HUD_BG);
   for (int y = 0; y < HUD_H; y += 2) graphics_draw_line(ctx, GPoint(0, y), GPoint(w - 1, y));
   char buf[16];
+  int hp = plant_health_pct(g);
+#ifdef PBL_ROUND
+  /* top row: night and speed; second row: money, ability, plant health around the centre */
+  int cx = w / 2;
+  snprintf(buf, sizeof(buf), s_fast ? "NIGHT %u  x2" : "NIGHT %u", (unsigned)g->night);
+  prv_text(ctx, buf, GRect(cx - 50, 4, 100, 18), GTextAlignmentCenter, COL_HUD_TEXT);
+  snprintf(buf, sizeof(buf), "$%ld", (long)g->money);
+  prv_text(ctx, buf, GRect(cx - 86, 19, 56, 18), GTextAlignmentRight, COL_HUD_MONEY);
+  prv_draw_ability(ctx, g, GRect(cx - 28, 19, 56, 18));
+  snprintf(buf, sizeof(buf), "%d%%", hp);
+  prv_text(ctx, buf, GRect(cx + 30, 19, 40, 18), GTextAlignmentLeft, health_color(hp));
+#else
   snprintf(buf, sizeof(buf), "$%ld", (long)g->money);
   prv_text(ctx, buf, GRect(3, -3, 50, HUD_H + 4), GTextAlignmentLeft, COL_HUD_MONEY);
   snprintf(buf, sizeof(buf), "NIGHT %u", (unsigned)g->night);
   prv_text(ctx, buf, GRect(46, -3, 52, HUD_H + 4), GTextAlignmentLeft, COL_HUD_TEXT);
   if (s_fast) prv_text(ctx, "x2", GRect(97, -3, 16, HUD_H + 4), GTextAlignmentLeft, COL_SELECT);
-  prv_draw_ability(ctx, g);
-  int hp = plant_health_pct(g);
+  prv_draw_ability(ctx, g, GRect(AB_HUD_X, -3, AB_HUD_W, HUD_H + 4));
   snprintf(buf, sizeof(buf), "%d%%", hp);
   prv_text(ctx, buf, GRect(w - 34, -3, 31, HUD_H + 4), GTextAlignmentRight, health_color(hp));
+#endif
 }
 
 static void prv_draw_mark(GContext *ctx, GPoint p, int radius, GColor col) {
@@ -137,7 +154,21 @@ static void prv_draw_mark(GContext *ctx, GPoint p, int radius, GColor col) {
   graphics_draw_line(ctx, GPoint(p.x, p.y - 3), GPoint(p.x, p.y + 3));
 }
 
-static GPoint prv_pt(Vec v) { return GPoint(v.x / FX, v.y / FX); }
+static GPoint prv_pt(Vec v) { return GPoint(v.x / FX - s_cam.x, v.y / FX - s_cam.y); }
+
+/* Leftmost x for a `w` wide label on row `y` so that it stays on screen: inside the circle on a
+ * round watch (centred where the circle is narrower than the label). */
+static int prv_clamp_label_x(int x, int y, int w, GRect b) {
+#ifdef PBL_ROUND
+  int r = b.size.w / 2, dy = y - b.size.h / 2, half = 0;
+  while (half * half + dy * dy < r * r) half++;
+  int lo = b.size.w / 2 - half + 2, hi = b.size.w / 2 + half - 2 - w;
+  if (hi < lo) return (b.size.w - w) / 2;
+  return x < lo ? lo : x > hi ? hi : x;
+#else
+  return x < 0 ? 0 : x + w > b.size.w ? b.size.w - w : x;
+#endif
+}
 
 /* Text with a 1 px black shadow: readable over the map. */
 static void prv_shadow_text(GContext *ctx, const char *txt, GRect r, GColor col) {
@@ -155,9 +186,8 @@ static void prv_draw_mark_label(GContext *ctx, const Game *g, GRect b) {
   else snprintf(buf, sizeof(buf), "Tap again: %s $%ld", ABILITY_SPECS[s_ability].name, (long)cost);
   int radius = ABILITY_SPECS[s_ability].radius, w = 170, h = 18;
   int y = s_mark_pt.y + radius + 1;
-  if (y + h > b.size.h) y = s_mark_pt.y - radius - h - 1;
-  int x = s_mark_pt.x - w / 2;
-  x = x < 0 ? 0 : x + w > b.size.w ? b.size.w - w : x;
+  if (y + h > b.size.h - PBL_IF_ROUND_ELSE(30, 0)) y = s_mark_pt.y - radius - h - 1;   /* round: the circle narrows */
+  int x = prv_clamp_label_x(s_mark_pt.x - w / 2, y + h / 2, w, b);
   prv_shadow_text(ctx, buf, GRect(x, y, w, h), cd == 0 && g->money >= cost ? COL_HUD_TEXT : COL_DISABLED);
 }
 
@@ -224,10 +254,17 @@ static void prv_draw_spawn_blips(GContext *ctx, const Game *g, GRect b) {
     const Effect *e = &g->effects[i];
     if (!e->active || e->kind != FX_SPAWN) continue;
     int el = SPAWN_WARN_MS - (e->ttl_ms < 0 ? 0 : e->ttl_ms);
-    int x = e->a.x / FX, y = e->a.y / FX;
+    GPoint p = prv_pt(e->a);
+    int x = p.x, y = p.y;
     x = x < BLIP_INSET ? BLIP_INSET : x > b.size.w - 1 - BLIP_INSET ? b.size.w - 1 - BLIP_INSET : x;
     y = y < HUD_H + BLIP_INSET ? HUD_H + BLIP_INSET : y > b.size.h - 1 - BLIP_INSET ? b.size.h - 1 - BLIP_INSET : y;
-    GPoint p = GPoint(x, y);
+#ifdef PBL_ROUND
+    /* a corner of the field is off the circle: pull the blip in towards the centre */
+    int cx = b.size.w / 2, cy = b.size.h / 2, r = cx - BLIP_INSET - 4;
+    int32_t dx = x - cx, dy = y - cy, d = fx_dist(dx, dy);
+    if (d > r) { x = cx + dx * r / d; y = cy + dy * r / d; }
+#endif
+    p = GPoint(x, y);
     graphics_context_set_stroke_color(ctx, GColorRed);
     graphics_draw_circle(ctx, p, 2 + el * 6 / SPAWN_WARN_MS);   /* expanding ping */
     if ((el / BLIP_BLINK_MS) % 2 == 0) {
@@ -239,8 +276,9 @@ static void prv_draw_spawn_blips(GContext *ctx, const Game *g, GRect b) {
 
 /* Start of the night: which night it is and where the drones come from. */
 static void prv_draw_banner(GContext *ctx, const Game *g, GRect b) {
-  render_raid_arrows(ctx, g, GRect(0, HUD_H, b.size.w, b.size.h - HUD_H));
-  GRect box = GRect(10, b.size.h / 3 - 24, b.size.w - 20, 64);
+  int top = -s_cam.y > HUD_H ? -s_cam.y : HUD_H;   /* the field on screen, below the HUD */
+  render_raid_arrows(ctx, g, GRect(-s_cam.x, top, WORLD_W, WORLD_H - s_cam.y - top));
+  GRect box = GRect(BOX_MARGIN, b.size.h / 3 - 24, b.size.w - 2 * BOX_MARGIN, 64);
   graphics_context_set_fill_color(ctx, COL_HUD_BG);
   graphics_fill_rect(ctx, box, 4, GCornersAll);
   graphics_context_set_stroke_color(ctx, GColorRed);
@@ -362,7 +400,7 @@ static void prv_tap(int16_t x, int16_t y) {
   if (s_paused || g->phase != PHASE_NIGHT) return;
   s_card = false;   /* the card covers the map centre: the player is aiming now */
   if (s_mark && fx_dist(x - s_mark_pt.x, y - s_mark_pt.y) <= MARK_CONFIRM_PX) {
-    Vec p = {s_mark_pt.x * FX, s_mark_pt.y * FX};
+    Vec p = {(s_mark_pt.x + s_cam.x) * FX, (s_mark_pt.y + s_cam.y) * FX};
     if (ability_use(g, s_ability, p)) s_mark = false;
     else feedback_short();   /* on cooldown or no money: the mark stays, nothing is spent */
   } else {
@@ -413,7 +451,9 @@ static void prv_clicks(void *ctx) {
 
 static void prv_load(Window *w) {
   Layer *root = window_get_root_layer(w);
-  s_layer = layer_create(layer_get_bounds(root));
+  GRect b = layer_get_bounds(root);
+  s_cam = (Camera){-(b.size.w - WORLD_W) / 2, -(b.size.h - WORLD_H) / 2, 1};
+  s_layer = layer_create(b);
   layer_set_update_proc(s_layer, prv_update);
   layer_add_child(root, s_layer);
   s_fast = false;

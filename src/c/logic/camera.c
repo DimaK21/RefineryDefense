@@ -18,9 +18,14 @@ void camera_pan(Camera *c, int16_t dx_px, int16_t dy_px, int16_t screen_w, int16
   camera_clamp(c, screen_w, screen_h);
 }
 
+/* Rounds down, also for points left of / above the viewport (the round screen draws past it). */
+static int16_t floor_div(int16_t v, uint8_t d) {
+  return v >= 0 ? v / d : -((-v + d - 1) / d);
+}
+
 void camera_to_world(const Camera *c, int16_t sx, int16_t sy, int16_t *wx, int16_t *wy) {
-  *wx = c->x + sx / c->zoom;
-  *wy = c->y + sy / c->zoom;
+  *wx = c->x + floor_div(sx, c->zoom);
+  *wy = c->y + floor_div(sy, c->zoom);
 }
 
 void camera_to_screen(const Camera *c, int16_t wx, int16_t wy, int16_t *sx, int16_t *sy) {

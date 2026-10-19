@@ -55,6 +55,8 @@ static void test_camera(void) {
   CHECK_EQ(wx, 62); CHECK_EQ(wy, 72);
   camera_to_screen(&c, 62, 72, &sx, &sy);
   CHECK_EQ(sx, 24); CHECK_EQ(sy, 24);
+  camera_to_world(&c, -1, -3, &wx, &wy);   /* left of / above the viewport (round screen) */
+  CHECK_EQ(wx, 49); CHECK_EQ(wy, 58);
   Camera n = {0, 0, 1};
   camera_clamp(&n, 200, 228);
   CHECK_EQ(n.x, 0); CHECK_EQ(n.y, 0);

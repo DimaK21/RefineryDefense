@@ -15,7 +15,17 @@
 #include "../logic/waves.h"
 
 #define DAY_ZOOM 2
+#ifdef PBL_ROUND
+#define HUD_H 38          /* two rows, low enough for the circle to be wide there */
+#define DOCK_Y 184        /* tower bar (or panel) on top of Play, filling the bottom of the circle */
+#define PANEL_W 200       /* as wide as on a rect watch; at DOCK_Y its corners still sit inside the circle */
+#define PLAY_W 80
+#define PLAY_H 26
+#define VIEW_INSET 42     /* camera viewport inset: its corners, i.e. the world's, stay visible */
+#define SIDE_DX 60        /* minimap / Reload: this far right / left of the centre */
+#else
 #define HUD_H 18
+#endif
 #define BAR_H 28
 #define SLOT_W 28
 #define MINI_W 46
@@ -27,7 +37,7 @@
 #define START_CONFIRM_MS 2000   /* UI tuning: a second Start tap / Select within this starts the night */
 
 static Window *s_window;
-static Layer *s_map_layer;      /* viewport between HUD and bar; camera space */
+static Layer *s_map_layer;      /* camera viewport; on a round screen the map is drawn past it */
 static Layer *s_ui_layer;       /* HUD, bar / panel, minimap on top */
 static GRect s_bounds;
 
@@ -45,12 +55,46 @@ static AppTimer *s_start_timer;
 
 /* ---- layout ---- */
 
+#ifdef PBL_ROUND
+/* Camera viewport: the camera clamps to it, so every world edge can be brought inside the circle. */
+static GRect prv_view_rect(void) {
+  return GRect(VIEW_INSET, VIEW_INSET, s_bounds.size.w - 2 * VIEW_INSET, DOCK_Y - MINI_MARGIN - VIEW_INSET);
+}
+/* Where a tap lands on the map: everything between HUD and dock. */
+static GRect prv_map_rect(void) {
+  return GRect(0, HUD_H, s_bounds.size.w, DOCK_Y - HUD_H);
+}
+static GRect prv_dock_rect(void) {
+  return GRect(0, DOCK_Y, s_bounds.size.w, s_bounds.size.h - DOCK_Y);
+}
+static GRect prv_bar_rect(void) {
+  return GRect((s_bounds.size.w - TW_COUNT * SLOT_W) / 2, DOCK_Y, TW_COUNT * SLOT_W, BAR_H);
+}
+static GRect prv_play_rect(void) {
+  return GRect((s_bounds.size.w - PLAY_W) / 2, DOCK_Y + BAR_H + 4, PLAY_W, PLAY_H);
+}
+static GRect prv_panel_rect(void) {
+  return GRect((s_bounds.size.w - PANEL_W) / 2, DOCK_Y, PANEL_W, BAR_H);
+}
+static GRect prv_mini_rect(void) {
+  return GRect(s_bounds.size.w / 2 + SIDE_DX, DOCK_Y - MINI_H - MINI_MARGIN, MINI_W, MINI_H);
+}
+static GRect prv_reload_rect(void) {
+  return GRect(s_bounds.size.w / 2 - SIDE_DX - RELOAD_W, DOCK_Y - RELOAD_H - MINI_MARGIN, RELOAD_W, RELOAD_H);
+}
+#else
 static GRect prv_map_rect(void) {
   return GRect(0, HUD_H, s_bounds.size.w, s_bounds.size.h - HUD_H - BAR_H);
 }
+static GRect prv_view_rect(void) { return prv_map_rect(); }
 static GRect prv_bar_rect(void) {
   return GRect(0, s_bounds.size.h - BAR_H, s_bounds.size.w, BAR_H);
 }
+static GRect prv_dock_rect(void) { return prv_bar_rect(); }
+static GRect prv_play_rect(void) {
+  return GRect(TW_COUNT * SLOT_W, s_bounds.size.h - BAR_H, s_bounds.size.w - TW_COUNT * SLOT_W, BAR_H);
+}
+static GRect prv_panel_rect(void) { return prv_bar_rect(); }
 static GRect prv_mini_rect(void) {
   return GRect(s_bounds.size.w - MINI_W - MINI_MARGIN, s_bounds.size.h - BAR_H - MINI_H - MINI_MARGIN,
                MINI_W, MINI_H);
@@ -59,6 +103,7 @@ static GRect prv_mini_rect(void) {
 static GRect prv_reload_rect(void) {
   return GRect(MINI_MARGIN, s_bounds.size.h - BAR_H - RELOAD_H - MINI_MARGIN, RELOAD_W, RELOAD_H);
 }
+#endif
 
 /* Only when some Tor / Patriot lacks missiles and a map tap means nothing else. */
 static bool prv_reload_shown(const Game *g) {
@@ -72,7 +117,7 @@ static void prv_dirty(void) {
 }
 
 static void prv_center_camera(void) {
-  GRect m = prv_map_rect();
+  GRect m = prv_view_rect();
   Vec c = object_center(OBJ_DISTILLATION);
   s_cam.zoom = DAY_ZOOM;
   s_cam.x = c.x / FX - m.size.w / DAY_ZOOM / 2;
@@ -111,13 +156,23 @@ static void prv_draw_hud(GContext *ctx, const Game *g) {
   int w = s_bounds.size.w;
   graphics_context_set_fill_color(ctx, COL_HUD_BG);
   graphics_fill_rect(ctx, GRect(0, 0, w, HUD_H), 0, GCornerNone);
+  int hp = plant_health_pct(g);
+#ifdef PBL_ROUND
+  /* day on top, money and plant health either side of the centre below it */
+  snprintf(buf, sizeof(buf), "DAY %u", (unsigned)g->night);
+  prv_text(ctx, buf, GRect(w / 2 - 40, 4, 80, 18), GTextAlignmentCenter, COL_HUD_TEXT);
+  snprintf(buf, sizeof(buf), "$%ld", (long)g->money);
+  prv_text(ctx, buf, GRect(w / 2 - 76, 19, 70, 18), GTextAlignmentRight, COL_HUD_MONEY);
+  snprintf(buf, sizeof(buf), "Plant %d%%", hp);
+  prv_text(ctx, buf, GRect(w / 2 + 6, 19, 76, 18), GTextAlignmentLeft, health_color(hp));
+#else
   snprintf(buf, sizeof(buf), "$%ld", (long)g->money);
   prv_text(ctx, buf, GRect(4, -1, w / 3, HUD_H), GTextAlignmentLeft, COL_HUD_MONEY);
   snprintf(buf, sizeof(buf), "DAY %u", (unsigned)g->night);
   prv_text(ctx, buf, GRect(w / 3, -1, w / 3, HUD_H), GTextAlignmentCenter, COL_HUD_TEXT);
-  int hp = plant_health_pct(g);
   snprintf(buf, sizeof(buf), "Plant %d%%", hp);
   prv_text(ctx, buf, GRect(w * 2 / 3 - 8, -1, w / 3 + 4, HUD_H), GTextAlignmentRight, health_color(hp));
+#endif
 }
 
 static void prv_draw_play(GContext *ctx, GRect r) {
@@ -132,10 +187,10 @@ static void prv_draw_play(GContext *ctx, GRect r) {
 static void prv_draw_bar(GContext *ctx, const Game *g) {
   GRect bar = prv_bar_rect();
   graphics_context_set_fill_color(ctx, COL_BAR_BG);
-  graphics_fill_rect(ctx, bar, 0, GCornerNone);
-  GRect play = GRect(TW_COUNT * SLOT_W, bar.origin.y, bar.size.w - TW_COUNT * SLOT_W, BAR_H);
+  graphics_fill_rect(ctx, prv_dock_rect(), 0, GCornerNone);
+  GRect play = prv_play_rect();
   if (s_start_armed) {
-    prv_text(ctx, "Tap again to start night", GRect(0, bar.origin.y + 5, play.origin.x, 18),
+    prv_text(ctx, "Tap again to start night", GRect(bar.origin.x, bar.origin.y + 5, TW_COUNT * SLOT_W, 18),
              GTextAlignmentCenter, COL_SELECT);
     graphics_context_set_fill_color(ctx, COL_SELECT);
     graphics_fill_rect(ctx, play, 0, GCornerNone);
@@ -143,13 +198,13 @@ static void prv_draw_bar(GContext *ctx, const Game *g) {
     return;
   }
   if (s_move) {
-    prv_text(ctx, "Tap a free cell to move", GRect(0, bar.origin.y + 5, bar.size.w, 18),
+    prv_text(ctx, "Tap a free cell to move", GRect(bar.origin.x, bar.origin.y + 5, bar.size.w, 18),
              GTextAlignmentCenter, COL_BAR_TEXT);
     return;
   }
   char buf[8];
   for (int t = 0; t < TW_COUNT; t++) {
-    GRect slot = GRect(t * SLOT_W, bar.origin.y, SLOT_W, BAR_H);
+    GRect slot = GRect(bar.origin.x + t * SLOT_W, bar.origin.y, SLOT_W, BAR_H);
     if (t == (int)s_sel) {
       graphics_context_set_fill_color(ctx, COL_BAR_SEL);
       graphics_fill_rect(ctx, slot, 0, GCornerNone);
@@ -220,7 +275,7 @@ static void prv_draw_minimap(GContext *ctx, const Game *g) {
     graphics_context_set_fill_color(ctx, tower_color(t->type));
     graphics_fill_rect(ctx, GRect(p.x, p.y, 2, 2), 0, GCornerNone);
   }
-  GRect v = prv_map_rect();
+  GRect v = prv_view_rect();
   GPoint a = prv_mini_pt(m, s_cam.x, s_cam.y);
   GPoint b = prv_mini_pt(m, s_cam.x + v.size.w / s_cam.zoom, s_cam.y + v.size.h / s_cam.zoom);
   graphics_context_set_stroke_color(ctx, COL_VIEW_FRAME);
@@ -232,8 +287,13 @@ static void prv_draw_minimap(GContext *ctx, const Game *g) {
 static void prv_ui_update(Layer *layer, GContext *ctx) {
   const Game *g = app_game();
   prv_draw_hud(ctx, g);
-  if (day_panel_kind() != PANEL_NONE) day_panel_draw(ctx, prv_bar_rect(), g);
-  else prv_draw_bar(ctx, g);
+  if (day_panel_kind() != PANEL_NONE) {
+    graphics_context_set_fill_color(ctx, COL_BAR_BG);
+    graphics_fill_rect(ctx, prv_dock_rect(), 0, GCornerNone);
+    day_panel_draw(ctx, prv_panel_rect(), g);
+  } else {
+    prv_draw_bar(ctx, g);
+  }
   prv_draw_minimap(ctx, g);
   prv_draw_reload(ctx, g);
 }
@@ -271,7 +331,7 @@ static void prv_request_start(void) {
 }
 
 static void prv_tap_bar(int16_t x) {
-  int slot = x / SLOT_W;
+  int slot = (x - prv_bar_rect().origin.x) / SLOT_W;
   if (slot < TW_COUNT) s_sel = (TowerType)slot;
   else prv_request_start();
 }
@@ -303,15 +363,16 @@ static void prv_tap_cell(Game *g, int col, int row) {
 static void prv_tap(int16_t x, int16_t y) {
   Game *g = app_game();
   GPoint p = GPoint(x, y);
-  GRect bar = prv_bar_rect(), mini = prv_mini_rect(), map = prv_map_rect();
+  GRect bar = prv_bar_rect(), play = prv_play_rect(), mini = prv_mini_rect(), map = prv_map_rect();
+  GRect view = prv_view_rect(), panel = prv_panel_rect();
   if (s_start_armed) {   /* only the Start button confirms; any other tap just disarms */
-    if (grect_contains_point(&bar, &p) && x >= TW_COUNT * SLOT_W) prv_request_start();
+    if (grect_contains_point(&play, &p)) prv_request_start();
     else prv_disarm_start();
     return;
   }
   if (day_panel_kind() != PANEL_NONE) {
-    if (grect_contains_point(&bar, &p)) {
-      if (day_panel_tap(g, bar, x, y) == PANEL_RES_MOVE) {
+    if (grect_contains_point(&panel, &p)) {
+      if (day_panel_tap(g, panel, x, y) == PANEL_RES_MOVE) {
         s_move = true;
         s_move_idx = day_panel_index();
       }
@@ -328,11 +389,12 @@ static void prv_tap(int16_t x, int16_t y) {
   }
   bool on_map = grect_contains_point(&map, &p) && !grect_contains_point(&mini, &p);
   if (s_move && !on_map) { s_move = false; return; }   /* bar hint, minimap, HUD: cancel */
+  if (grect_contains_point(&play, &p)) { prv_request_start(); return; }
   if (grect_contains_point(&bar, &p)) { prv_tap_bar(x); return; }
   if (!on_map) return;   /* minimap, HUD */
   int16_t wx, wy;
   int col, row;
-  camera_to_world(&s_cam, x - map.origin.x, y - map.origin.y, &wx, &wy);
+  camera_to_world(&s_cam, x - view.origin.x, y - view.origin.y, &wx, &wy);
   if (world_to_cell(wx, wy, &col, &row)) prv_tap_cell(g, col, row);
   else { s_ghost = false; s_move = false; }
 }
@@ -355,7 +417,7 @@ static void prv_touch(const TouchEvent *e, void *ctx) {
       /* fall through */
     case GES_PAN_MOVE: {
       /* absolute from the pan origin: no drift from per-event truncation */
-      GRect m = prv_map_rect();
+      GRect m = prv_view_rect();
       s_cam.x = s_pan_cam_x - (gs.x - s_gt.x0) / s_cam.zoom;
       s_cam.y = s_pan_cam_y - (gs.y - s_gt.y0) / s_cam.zoom;
       camera_clamp(&s_cam, m.size.w, m.size.h);
@@ -407,7 +469,8 @@ static void prv_load(Window *w) {
   s_start_armed = false;
   day_panel_close();
   prv_center_camera();
-  s_map_layer = layer_create(prv_map_rect());
+  s_map_layer = layer_create(prv_view_rect());
+  layer_set_clips(s_map_layer, PBL_IF_ROUND_ELSE(false, true));   /* round: fill the circle around the viewport */
   layer_set_update_proc(s_map_layer, prv_map_update);
   layer_add_child(root, s_map_layer);
   s_ui_layer = layer_create(s_bounds);
@@ -438,6 +501,7 @@ static void prv_disappear(Window *w) {
 void day_window_push(void) {
   if (!s_window) {
     s_window = window_create();
+    window_set_background_color(s_window, GColorBlack);   /* round: past the world's edge */
     window_set_touch_bridge_disabled(s_window, true);
     window_set_click_config_provider(s_window, prv_clicks);
     window_set_window_handlers(s_window, (WindowHandlers){

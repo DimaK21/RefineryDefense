@@ -52,8 +52,9 @@ static void prv_update(Layer *layer, GContext *ctx) {
   y += 26;
   snprintf(score, sizeof(score), "%lu", (unsigned long)g->score);
   snprintf(rec, sizeof(rec), "%u nights \xC2\xB7 %lu", (unsigned)best.nights, (unsigned long)best.score);
-  ui_stat_row(ctx, GRect(12, y, w - 24, 24), "Score", score, UI_ACCENT);
-  ui_stat_row(ctx, GRect(12, y + 24, w - 24, 24), "Best", rec, UI_TEXT);
+  int m = 12 + UI_ROUND_INSET;
+  ui_stat_row(ctx, GRect(m, y, w - 2 * m, 24), "Score", score, UI_ACCENT);
+  ui_stat_row(ctx, GRect(m, y + 24, w - 2 * m, 24), "Best", rec, UI_TEXT);
   if (s_ready) ui_footer(ctx, b, s_record ? "Select: send \xC2\xB7 Tap: skip" : "Tap to continue");
 }
 

@@ -13,7 +13,8 @@
 #define BTN_H 26
 #define BTN_GAP 4
 #define BTN_MAX 4   /* Continue, New Game, Leaders, Settings */
-#define BTN_TOP 70
+#define TOP PBL_IF_ROUND_ELSE(24, 0)   /* round: the title moves down to where the circle is wide */
+#define BTN_TOP (70 + TOP)
 #define NEW_CONFIRM_MS 2500   /* UI tuning: a second New Game within this overwrites the save */
 
 typedef enum { ITEM_CONTINUE, ITEM_NEW, ITEM_LEADERS, ITEM_SETTINGS } Item;
@@ -99,13 +100,13 @@ static void prv_update(Layer *layer, GContext *ctx) {
   GRect b = layer_get_bounds(layer);
   ui_background(ctx, b);
   ui_skyline(ctx, b);
-  ui_text(ctx, "REFINERY", FONT_KEY_BITHAM_30_BLACK, GRect(0, 4, b.size.w, 36), GTextAlignmentCenter,
+  ui_text(ctx, "REFINERY", FONT_KEY_BITHAM_30_BLACK, GRect(0, 4 + TOP, b.size.w, 36), GTextAlignmentCenter,
           UI_TEXT);
   graphics_context_set_stroke_color(ctx, UI_ACCENT);
-  graphics_draw_line(ctx, GPoint(28, 52), GPoint(58, 52));
-  graphics_draw_line(ctx, GPoint(b.size.w - 59, 52), GPoint(b.size.w - 29, 52));
-  ui_text(ctx, s_picking ? "DIFFICULTY" : "DEFENSE", FONT_KEY_GOTHIC_18_BOLD, GRect(0, 39, b.size.w, 22), GTextAlignmentCenter,
-          UI_ACCENT);
+  graphics_draw_line(ctx, GPoint(28, 52 + TOP), GPoint(58, 52 + TOP));
+  graphics_draw_line(ctx, GPoint(b.size.w - 59, 52 + TOP), GPoint(b.size.w - 29, 52 + TOP));
+  ui_text(ctx, s_picking ? "DIFFICULTY" : "DEFENSE", FONT_KEY_GOTHIC_18_BOLD, GRect(0, 39 + TOP, b.size.w, 22),
+          GTextAlignmentCenter, UI_ACCENT);
   for (int i = 0; i < s_count; i++) {
     if (s_picking) { ui_button(ctx, prv_btn_rect(b, i), DIFFICULTY_SPECS[i].name, i == s_sel, false); continue; }
     bool armed = s_items[i] == ITEM_NEW && s_new_armed;

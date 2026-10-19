@@ -9,6 +9,7 @@
 #include "../logic/config.h"
 
 #define ROW_H 16
+#define LIST_X (4 + UI_ROUND_INSET)
 
 typedef enum { ST_SENDING, ST_ERROR, ST_DONE } State;
 
@@ -47,10 +48,10 @@ static void prv_update(Layer *layer, GContext *ctx) {
       ui_text(ctx, line, FONT_KEY_GOTHIC_14_BOLD, GRect(0, y, w, 18), GTextAlignmentCenter, UI_TEXT);
     }
     y += 20;
-    ui_board_header(ctx, GRect(4, y, w - 8, ROW_H));
+    ui_board_header(ctx, GRect(LIST_X, y, w - 2 * LIST_X, ROW_H));
     for (int i = 0; i < s_reply.n_rows; i++) {
       const BoardRow *r = &s_reply.rows[i];
-      ui_board_row(ctx, GRect(4, y + ROW_H * (i + 1), w - 8, ROW_H), r, r->rank == s_reply.rank);
+      ui_board_row(ctx, GRect(LIST_X, y + ROW_H * (i + 1), w - 2 * LIST_X, ROW_H), r, r->rank == s_reply.rank);
     }
   }
   if (s_state != ST_SENDING) ui_footer(ctx, b, "Tap to continue");

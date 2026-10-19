@@ -67,9 +67,19 @@ static void prv_update(Layer *layer, GContext *ctx) {
   snprintf(kicker, sizeof(kicker), "HOW TO PLAY  %d/%d", s_page + 1, PAGE_COUNT);
   ui_background(ctx, b);
   ui_header(ctx, b, UI_HDR_INFO, kicker, p->title);
-  ui_text(ctx, p->body, p->small ? FONT_KEY_GOTHIC_18 : FONT_KEY_GOTHIC_24_BOLD,
-          GRect(MARGIN, UI_HEADER_H + 4, b.size.w - 2 * MARGIN, b.size.h - UI_HEADER_H - UI_FOOTER_H - 4),
-          GTextAlignmentLeft, UI_TEXT);
+  GRect body = GRect(MARGIN, UI_HEADER_H + 4, b.size.w - 2 * MARGIN, b.size.h - UI_HEADER_H - UI_FOOTER_H - 4);
+  const char *font = p->small ? FONT_KEY_GOTHIC_18 : FONT_KEY_GOTHIC_24_BOLD;
+#ifdef PBL_ROUND
+  /* lines shorten towards the bottom of the circle instead of being cut off */
+  GTextAttributes *flow = graphics_text_attributes_create();
+  graphics_text_attributes_enable_screen_text_flow(flow, MARGIN);
+  graphics_context_set_text_color(ctx, UI_TEXT);
+  graphics_draw_text(ctx, p->body, fonts_get_system_font(font), body, GTextOverflowModeTrailingEllipsis,
+                     GTextAlignmentCenter, flow);
+  graphics_text_attributes_destroy(flow);
+#else
+  ui_text(ctx, p->body, font, body, GTextAlignmentLeft, UI_TEXT);
+#endif
   int y = b.size.h - UI_FOOTER_H / 2, x0 = (b.size.w - (PAGE_COUNT - 1) * DOT_GAP) / 2;
   for (int i = 0; i < PAGE_COUNT; i++) {
     graphics_context_set_fill_color(ctx, i == s_page ? UI_ACCENT : GColorDarkGray);
