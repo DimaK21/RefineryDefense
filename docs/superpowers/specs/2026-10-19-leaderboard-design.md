@@ -123,10 +123,10 @@ NEW RECORD и в футере «Tap to continue». Добавляется: ес�
 Посредник между часами и LootLocker. Хранит сессию в `localStorage`.
 
 - **Идентификатор игрока:** `Pebble.getAccountToken()`; если пусто — случайный UUID, один раз
-  сохранённый в `localStorage`. Телефонное приложение пользователь не уточнил, поэтому код не
-  полагается ни на одно из них (Core Devices / Rebble, iOS / Android): fallback обязателен.
-  Проверка — в эмуляторе (`pebble install --emulator emery`), на реальном телефоне — пользователем.
-  (Моё решение.) Используется как `player_identifier` для гостевого входа.
+  сохранённый в `localStorage`. Пользователь играет через приложение **Pebble от Core Devices
+  на Android** — это целевая платформа. Fallback всё равно обязателен: что вернёт
+  `getAccountToken()` в этом приложении, не проверено. Проверка — в эмуляторе
+  (`pebble install --emulator emery`), на реальном телефоне — пользователем. Используется как `player_identifier` для гостевого входа.
 - **Сессия:** гостевой вход `POST /game/v2/session/guest` с `game_key`, `player_identifier`,
   `game_version`. Ответ даёт `session_token` (заголовок `x-session-token` дальше) и `player_id`
   (он же `member_id` в таблицах типа Player). При 401 на любом запросе — перелогиниться
