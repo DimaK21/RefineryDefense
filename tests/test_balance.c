@@ -20,7 +20,9 @@
  * Reference with DIFFICULTY_SPECS[DIFF_NORMAL].start_money 500 over 1000 seeds: mean 15.6, Q1 14, median 18, 1.2% lost by night 5.
  * At DIFFICULTY_SPECS[DIFF_NORMAL].start_money 400 it was mean 8.3, Q1 5, median 6, 12.8% lost by night 5.
  * Plant roles with a random second unit, 60 seeds: Normal mean 16.3, Q1 12, median 18, 2 lost by night 5;
- * by start unit Tank Farm A 16.3, Tank Farm B 16.0, Loading Terminal 17.0, Cracking Unit 17.7. */
+ * by start unit Tank Farm A 16.3, Tank Farm B 16.0, Loading Terminal 17.0, Cracking Unit 17.7.
+ * Air Strike landing at once (was 1.5 s later): mean 17.1, Q1 17, median 19, 2 lost by night 5;
+ * by start unit 16.4-18.3. */
 #define SEEDS 60
 #define BAL_MEAN_MIN 11
 #define BAL_MEAN_MAX 20
@@ -176,8 +178,8 @@ static void test_balance(void) {
 }
 
 /* Easy and Hard must stay ordered around Normal by a clear margin, and still end. Reference over 60 seeds:
- * Easy ($600, waves 70%) mean 22.8, Q1 22, 0 lost by night 5; Hard ($500, waves 160%) mean 9.5, Q1 6,
- * median 8, 2 lost by night 5 (before plant roles: Easy 22.5, Hard 10.5). Hard with $450 and waves 140%
+ * Easy ($600, waves 70%) mean 23.4, Q1 22, 0 lost by night 5; Hard ($500, waves 160%) mean 10.1, Q1 7,
+ * median 9, 1 lost by night 5 (instant Air Strike; before plant roles: Easy 22.5, Hard 10.5). Hard with $450 and waves 140%
  * lost 12 of 60 by night 5. */
 static void test_difficulties(void) {
   BalStats n = s_normal, e = measure(DIFF_EASY), h = measure(DIFF_HARD);

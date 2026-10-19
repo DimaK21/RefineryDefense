@@ -12,7 +12,7 @@ typedef struct {
 
 typedef struct {
   const char *name; uint16_t cost, cooldown_ms; uint8_t radius;
-  uint16_t duration_ms;   /* Air Strike: delay before it lands; EW Pulse, Flare: how long the zone lasts */
+  uint16_t duration_ms;   /* EW Pulse, Flare: how long the zone lasts; Air Strike lands at once (0) */
 } AbilitySpec;
 
 typedef struct {

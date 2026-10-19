@@ -48,17 +48,14 @@ static void test_defended_night(void) {
   CHECK_EQ(g.score, (uint32_t)g.stats.bounty + SCORE_PER_NIGHT);
 }
 
-static void test_night_waits_for_air(void) {
+static void test_air_strike_ends_with_night(void) {
   Game g; game_new_start(&g, 1, DIFF_NORMAL, OBJ_TANK_A);
   night_begin(&g);
   g.wave_len = 0; g.wave_next = 0;
   g.money = 100;
   CHECK(ability_use(&g, AB_AIR, at(50, 50)));
-  sim_tick(&g, 100);
-  CHECK(g.phase == PHASE_NIGHT);                   /* strike pending */
-  for (int i = 0; i < 14; i++) sim_tick(&g, 100);
-  CHECK(!g.air_active);
-  CHECK(g.phase == PHASE_REPORT);
+  sim_tick(&g, 40);
+  CHECK(g.phase == PHASE_REPORT);                  /* nothing pending: the strike has already landed */
 }
 
 static void test_report_and_next_night(void) {
@@ -92,28 +89,22 @@ static void test_air_support(void) {
   CHECK(!ability_ready(&g, AB_AIR));
   CHECK(!ability_use(&g, AB_AIR, at(50, 50)));
   CHECK_EQ(g.money, 59);
-  g.money = 100;
-  CHECK(ability_use(&g, AB_AIR, at(50, 50)));
-  CHECK_EQ(g.money, 40);
-  CHECK(g.air_active);
-  CHECK_EQ(g.ab_cooldown_ms[AB_AIR], ABILITY_SPECS[AB_AIR].cooldown_ms);
-  g.money = 100;
-  CHECK(!ability_use(&g, AB_AIR, at(50, 50)));     /* on cooldown */
-  CHECK_EQ(g.money, 100);
-  g.money = 40;
   put_drone(&g, 0, DR_SHAHED136, at(60, 50), 1);   /* 10 away: dies */
   put_drone(&g, 1, DR_SHAHED136, at(50, 80), 2);   /* 30 away: lives */
-  for (int i = 0; i < 14; i++) sim_tick(&g, 100);
-  CHECK(g.drones[0].active && g.air_active);
-  sim_tick(&g, 100);
-  CHECK(!g.air_active);
+  g.money = 100;
+  CHECK(ability_use(&g, AB_AIR, at(50, 50)));      /* lands at once, no delay */
   CHECK(!g.drones[0].active);
   CHECK(g.drones[1].active);
   CHECK_EQ(g.stats.kills, 1);
-  CHECK(g.money > 40);
+  CHECK_EQ(g.money, 40 + DRONE_SPECS[DR_SHAHED136].bounty);
+  CHECK_EQ(g.ab_cooldown_ms[AB_AIR], ABILITY_SPECS[AB_AIR].cooldown_ms);
   bool fx = false;
   for (int i = 0; i < MAX_EFFECTS; i++) if (g.effects[i].active && g.effects[i].kind == FX_AIRSTRIKE) fx = true;
   CHECK(fx);
+  int32_t m = g.money;
+  CHECK(!ability_use(&g, AB_AIR, at(50, 80)));     /* on cooldown */
+  CHECK_EQ(g.money, m); CHECK(g.drones[1].active);
+  sim_tick(&g, 40);
   CHECK(g.phase == PHASE_NIGHT);                   /* drone 1 still flying */
 }
 
@@ -202,7 +193,7 @@ int main(void) {
   RUN(test_cracker_abilities);
   RUN(test_begin_and_full_night);
   RUN(test_defended_night);
-  RUN(test_night_waits_for_air);
+  RUN(test_air_strike_ends_with_night);
   RUN(test_report_and_next_night);
   RUN(test_air_support);
   RUN(test_air_not_in_day);

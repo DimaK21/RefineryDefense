@@ -44,7 +44,7 @@ static uint32_t s_card_ms;
 static const char *const AB_SHORT[AB_COUNT] = {"AIR", "EW", "FLARE"};
 static const char *const AB_TITLE[AB_COUNT] = {"AIR STRIKE", "EW PULSE", "FLARE"};
 static const char *const AB_DESC[AB_COUNT] = {
-  "Destroys all drones in the circle after 1.5s",
+  "Instantly destroys all drones in the circle",
   "Slows drones in the circle for 5s",
   "Lights the circle for 6s, towers in it get full range",
 };
@@ -280,7 +280,6 @@ static void prv_update(Layer *layer, GContext *ctx) {
   render_towers(ctx, g, &s_cam, false);
   prv_draw_zones(ctx, g);
   render_entities(ctx, g, &s_cam);
-  if (g->air_active) prv_draw_mark(ctx, prv_pt(g->air_point), ABILITY_SPECS[AB_AIR].radius, COL_EXPLOSION);
   if (s_mark) {
     prv_draw_mark(ctx, s_mark_pt, ABILITY_SPECS[s_ability].radius,
                   ability_ready(g, s_ability) ? COL_AIR_MARK : COL_DISABLED);

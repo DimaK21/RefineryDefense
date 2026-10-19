@@ -23,7 +23,7 @@ const DroneSpec DRONE_SPECS[DR_COUNT] = {
 
 const AbilitySpec ABILITY_SPECS[AB_COUNT] = {
   /*              name         cost cooldown radius duration */
-  [AB_AIR]   = {"Air Strike",  60, 25000, 25, 1500},
+  [AB_AIR]   = {"Air Strike",  60, 25000, 25,    0},
   [AB_EW]    = {"EW Pulse",    25, 12000, 40, 5000},
   [AB_FLARE] = {"Flare",       15,  8000, 45, 6000},
 };

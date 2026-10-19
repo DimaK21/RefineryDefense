@@ -40,7 +40,6 @@ typedef struct {
   Tower towers[MAX_TOWERS]; Drone drones[MAX_DRONES];
   Missile missiles[MAX_MISSILES]; Effect effects[MAX_EFFECTS];
   WaveEntry wave[MAX_WAVE]; uint16_t wave_len, wave_next, next_uid; uint32_t night_ms;
-  uint8_t air_active; Vec air_point; int16_t air_timer_ms;        // Air Strike waiting to land
   uint16_t ab_cooldown_ms[AB_COUNT];                                // 0 = ready
   Vec ew_point, flare_point; int16_t ew_ms, flare_ms;               // active zones: ms left, 0 = off
   uint16_t combo; int16_t combo_ms;                                 // kill streak, ms left in its window

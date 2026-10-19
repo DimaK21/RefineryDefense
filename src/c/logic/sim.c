@@ -16,7 +16,6 @@ bool night_begin(Game *g) {
   memset(&g->stats, 0, sizeof(g->stats));
   g->wave_len = wave_generate(g->wave, MAX_WAVE, g->night, alive_objects(g), (Difficulty)g->difficulty, g->seed);
   g->wave_next = 0; g->night_ms = 0;
-  g->air_active = 0; g->air_timer_ms = 0;
   memset(g->ab_cooldown_ms, 0, sizeof(g->ab_cooldown_ms));
   g->ew_ms = g->flare_ms = 0;
   g->combo = 0; g->combo_ms = 0;
@@ -40,13 +39,24 @@ bool ability_ready(const Game *g, Ability a) {
       && g->money >= ability_cost(g, a);
 }
 
+/* Every drone in the circle dies at once: a delay made the player lead moving drones blind. */
+static void air_strike(Game *g, Vec p) {
+  int32_t r = ABILITY_SPECS[AB_AIR].radius * FX;
+  for (int i = 0; i < MAX_DRONES; i++) {
+    const Drone *d = &g->drones[i];
+    if (!d->active) continue;
+    if (fx_within(d->pos.x - p.x, d->pos.y - p.y, r)) kill_drone(g, i);
+  }
+  effect_add(g, FX_AIRSTRIKE, p, p, EFFECT_MS);
+}
+
 bool ability_use(Game *g, Ability a, Vec p) {
   if (!ability_ready(g, a)) return false;
   const AbilitySpec *s = &ABILITY_SPECS[a];
   g->money -= ability_cost(g, a);
   g->ab_cooldown_ms[a] = ability_cooldown(g, a);
   switch (a) {
-    case AB_AIR:   g->air_active = 1; g->air_point = p; g->air_timer_ms = (int16_t)s->duration_ms; break;
+    case AB_AIR:   air_strike(g, p); break;
     case AB_EW:    g->ew_point = p; g->ew_ms = (int16_t)s->duration_ms; break;
     default:       g->flare_point = p; g->flare_ms = (int16_t)s->duration_ms; break;   /* AB_FLARE */
   }
@@ -54,17 +64,6 @@ bool ability_use(Game *g, Ability a, Vec p) {
 }
 
 static int16_t count_down(int16_t v, uint16_t dt_ms) { return v > (int16_t)dt_ms ? (int16_t)(v - dt_ms) : 0; }
-
-static void air_strike(Game *g) {
-  int32_t r = ABILITY_SPECS[AB_AIR].radius * FX;
-  for (int i = 0; i < MAX_DRONES; i++) {
-    const Drone *d = &g->drones[i];
-    if (!d->active) continue;
-    if (fx_within(d->pos.x - g->air_point.x, d->pos.y - g->air_point.y, r)) kill_drone(g, i);
-  }
-  effect_add(g, FX_AIRSTRIKE, g->air_point, g->air_point, EFFECT_MS);
-  g->air_active = 0;
-}
 
 void sim_tick(Game *g, uint16_t dt_ms) {
   if (g->phase != PHASE_NIGHT) return;
@@ -81,10 +80,6 @@ void sim_tick(Game *g, uint16_t dt_ms) {
   }
   drones_update(g, dt_ms);
   combat_update(g, dt_ms);
-  if (g->air_active) {
-    g->air_timer_ms = (int16_t)(g->air_timer_ms - dt_ms);
-    if (g->air_timer_ms <= 0) air_strike(g);
-  }
   for (int i = 0; i < MAX_EFFECTS; i++) {
     Effect *e = &g->effects[i];
     if (!e->active) continue;
@@ -93,7 +88,6 @@ void sim_tick(Game *g, uint16_t dt_ms) {
   }
   if (alive_objects(g) == 0) { g->phase = PHASE_GAME_OVER; return; }
   if (g->wave_next < g->wave_len) return;
-  if (g->air_active) return;
   for (int i = 0; i < MAX_DRONES; i++) if (g->drones[i].active) return;
   g->stats.income = morning_income(g);
   g->money += g->stats.income;
