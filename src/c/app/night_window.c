@@ -361,6 +361,7 @@ static void prv_focus(bool in_focus) {
 static void prv_tap(int16_t x, int16_t y) {
   Game *g = app_game();
   if (s_paused || g->phase != PHASE_NIGHT) return;
+  s_card = false;   /* the card covers the map centre: the player is aiming now */
   if (s_mark && fx_dist(x - s_mark_pt.x, y - s_mark_pt.y) <= MARK_CONFIRM_PX) {
     Vec p = {s_mark_pt.x * FX, s_mark_pt.y * FX};
     if (ability_use(g, s_ability, p)) s_mark = false;
