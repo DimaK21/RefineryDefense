@@ -3,11 +3,13 @@
 #include "settings.h"
 #include "feedback.h"
 #include "help_window.h"
+#include "name_window.h"
+#include "storage.h"
 #include "ui.h"
 #include "ui_colors.h"
 
-#define ROW_H 44
-#define ROW_GAP 6
+#define ROW_H 34
+#define ROW_GAP 4
 #define ROW_MARGIN 8
 #define TOGGLE_W 38
 #define TOGGLE_H 20
@@ -16,7 +18,7 @@
 #define APP_VERSION "dev"
 #endif
 
-typedef enum { ROW_SOUND, ROW_VIBE, ROW_HELP, ROW_COUNT } Row;
+typedef enum { ROW_SOUND, ROW_VIBE, ROW_NAME, ROW_HELP, ROW_COUNT } Row;
 typedef enum { CTL_OFF, CTL_ON, CTL_OPEN } Control;
 
 static Window *s_window;
@@ -39,9 +41,9 @@ static void prv_draw_row(GContext *ctx, GRect r, const char *title, const char *
     graphics_context_set_stroke_width(ctx, 1);
   }
   int text_w = r.size.w - TOGGLE_W - 22;
-  ui_text(ctx, title, FONT_KEY_GOTHIC_24_BOLD, GRect(r.origin.x + 10, r.origin.y - 2, text_w, 28),
+  ui_text(ctx, title, FONT_KEY_GOTHIC_18_BOLD, GRect(r.origin.x + 10, r.origin.y - 1, text_w, 22),
           GTextAlignmentLeft, UI_TEXT);
-  ui_text(ctx, sub, FONT_KEY_GOTHIC_14, GRect(r.origin.x + 10, r.origin.y + 23, text_w, 18),
+  ui_text(ctx, sub, FONT_KEY_GOTHIC_14, GRect(r.origin.x + 10, r.origin.y + 16, text_w, 18),
           GTextAlignmentLeft, UI_MUTED);
   if (ctl == CTL_OPEN) {   /* chevron: opens a screen */
     int x = r.origin.x + r.size.w - 20, y = r.origin.y + r.size.h / 2;
@@ -64,6 +66,9 @@ static void prv_update(Layer *layer, GContext *ctx) {
                settings_sound() ? CTL_ON : CTL_OFF, s_sel == ROW_SOUND);
   prv_draw_row(ctx, prv_row_rect(b, ROW_VIBE), "Vibration",
                settings_vibe() ? "Hits on the plant" : "No buzzing", settings_vibe() ? CTL_ON : CTL_OFF, s_sel == ROW_VIBE);
+  char name[NAME_LEN + 1];
+  prv_draw_row(ctx, prv_row_rect(b, ROW_NAME), "Name", storage_name(name) ? name : "Not set", CTL_OPEN,
+               s_sel == ROW_NAME);
   prv_draw_row(ctx, prv_row_rect(b, ROW_HELP), "How to play", "Rules in 9 short pages", CTL_OPEN,
                s_sel == ROW_HELP);
   ui_footer(ctx, b, "v" APP_VERSION);
@@ -72,6 +77,10 @@ static void prv_update(Layer *layer, GContext *ctx) {
 static void prv_toggle(int row) {
   if (row == ROW_HELP) {
     help_window_push();
+    return;
+  }
+  if (row == ROW_NAME) {
+    name_window_push(NULL);
     return;
   }
   if (row == ROW_SOUND) {

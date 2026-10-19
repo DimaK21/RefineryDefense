@@ -10,6 +10,7 @@
 #include "settings_window.h"
 #include "help_window.h"
 #include "net.h"
+#include "name_window.h"
 
 static Game s_game;
 
@@ -34,6 +35,7 @@ int main(void) {
   menu_window_destroy();
   settings_window_destroy();
   help_window_destroy();
+  name_window_destroy();
   touch_off_window_destroy();
   day_window_destroy();
   night_window_destroy();
