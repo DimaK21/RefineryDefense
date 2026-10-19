@@ -1,5 +1,6 @@
 #include <string.h>
 #include "save.h"
+#include "board.h"
 #include "config.h"
 #include "economy.h"
 
@@ -105,7 +106,7 @@ bool save_read_blob(Game *g, bool *pending_night, const uint8_t *buf, size_t len
 }
 
 bool best_update(Best *b, uint16_t nights, uint32_t score) {
-  if (nights > b->nights || (nights == b->nights && score > b->score)) {
+  if (best_beats((Best){ nights, score }, *b)) {
     b->nights = nights; b->score = score;
     return true;
   }
