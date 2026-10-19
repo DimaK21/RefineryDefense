@@ -11,7 +11,7 @@ static void test_sizes(void) {
 }
 
 static void setup(Game *g) {
-  game_new(g, 7, DIFF_HARD);
+  game_new_start(g, 7, DIFF_HARD, OBJ_TANK_A);
   g->money = 1000;
   tower_buy(g, TW_MG, 4, 8);
   tower_buy(g, TW_GEPARD, 7, 8);
@@ -104,7 +104,7 @@ static void test_blob(void) {
    save written after report_ack is byte-identical: no double income on Continue. */
 static void test_save_at_report(void) {
   static Game g, b;
-  game_new(&g, 3, DIFF_NORMAL);
+  game_new_start(&g, 3, DIFF_NORMAL, OBJ_TANK_A);
   CHECK(night_begin(&g));
   for (int i = 0; i < 20000 && g.phase == PHASE_NIGHT; i++) sim_tick(&g, 40);
   CHECK(g.phase == PHASE_REPORT);
@@ -124,7 +124,7 @@ static void test_save_at_report(void) {
 }
 
 static void test_wave_identical(void) {
-  Game a, b; memset(&b, 0, sizeof b); game_new(&a, 11, DIFF_NORMAL);
+  Game a, b; memset(&b, 0, sizeof b); game_new_start(&a, 11, DIFF_NORMAL, OBJ_TANK_A);
   a.night = 3; a.objects[OBJ_TERMINAL].status = OBJ_ALIVE; a.objects[OBJ_TERMINAL].hp = 100;
   uint8_t h[SAVE_HDR_LEN], t[SAVE_TOWERS_LEN];
   save_write_header(&a, true, h, sizeof h);

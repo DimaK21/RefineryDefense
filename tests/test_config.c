@@ -26,7 +26,7 @@ static void test_object_layout(void) {
 
 static void test_game_new(void) {
   Game g;
-  game_new(&g, 1, DIFF_NORMAL);
+  game_new_start(&g, 1, DIFF_NORMAL, OBJ_TANK_A);
   CHECK_EQ(g.phase, PHASE_DAY);
   CHECK_EQ(g.night, 1);
   CHECK_EQ(g.money, DIFFICULTY_SPECS[DIFF_NORMAL].start_money);
@@ -48,7 +48,7 @@ static void test_difficulty(void) {
   CHECK(DIFFICULTY_SPECS[DIFF_HARD].wave_pct > DIFFICULTY_SPECS[DIFF_NORMAL].wave_pct);
   CHECK(DIFFICULTY_SPECS[DIFF_EASY].wave_pct < DIFFICULTY_SPECS[DIFF_NORMAL].wave_pct);
   CHECK_EQ(DIFFICULTY_SPECS[DIFF_NORMAL].wave_pct, 100);
-  game_new(&g, 1, DIFF_COUNT);                       /* out of range falls back to Normal */
+  game_new_start(&g, 1, DIFF_COUNT, OBJ_TANK_A);                       /* out of range falls back to Normal */
   CHECK_EQ(g.difficulty, DIFF_NORMAL);
 }
 

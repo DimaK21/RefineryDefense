@@ -21,6 +21,7 @@ typedef struct {
 
 typedef struct {
   const char *name; uint8_t income; uint16_t build_cost; uint8_t col, row;  /* occupies 2x2 cells */
+  const char *role;   /* short perk while alive, NULL: none */
 } ObjectSpec;
 
 extern const TowerSpec TOWER_SPECS[TW_COUNT];
@@ -29,6 +30,14 @@ extern const ObjectSpec OBJECT_SPECS[OBJ_COUNT];
 extern const AbilitySpec ABILITY_SPECS[AB_COUNT];
 extern const DifficultySpec DIFFICULTY_SPECS[DIFF_COUNT];
 
+/* Plant roles: each unit but the centre grants a perk while it is alive (any HP). */
+#define OBJ_ROLE_COMBO OBJ_TANK_A       /* kill streak bounty multiplier */
+#define OBJ_ROLE_MISSILES OBJ_TANK_B    /* missiles ROLE_MISSILE_OFF_PCT cheaper */
+#define OBJ_ROLE_TOWERS OBJ_TERMINAL    /* tower purchase and repair ROLE_TOWER_OFF_PCT cheaper */
+#define OBJ_ROLE_ABILITIES OBJ_CRACKER  /* ability cost and cooldown ROLE_ABILITY_OFF_PCT lower */
+#define ROLE_MISSILE_OFF_PCT 50
+#define ROLE_TOWER_OFF_PCT 15
+#define ROLE_ABILITY_OFF_PCT 30
 #define SELL_REFUND_PCT 50
 #define TOWER_REPAIR_PCT 30
 #define REBUILD_PCT 150

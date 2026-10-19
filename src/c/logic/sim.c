@@ -25,16 +25,26 @@ bool night_begin(Game *g) {
   return true;
 }
 
+int32_t ability_cost(const Game *g, Ability a) {
+  int32_t c = ABILITY_SPECS[a].cost;
+  return object_alive(g, OBJ_ROLE_ABILITIES) ? discounted(c, ROLE_ABILITY_OFF_PCT) : c;
+}
+
+uint16_t ability_cooldown(const Game *g, Ability a) {
+  uint16_t c = ABILITY_SPECS[a].cooldown_ms;
+  return object_alive(g, OBJ_ROLE_ABILITIES) ? (uint16_t)((uint32_t)c * (100 - ROLE_ABILITY_OFF_PCT) / 100) : c;
+}
+
 bool ability_ready(const Game *g, Ability a) {
   return g->phase == PHASE_NIGHT && a < AB_COUNT && g->ab_cooldown_ms[a] == 0
-      && g->money >= ABILITY_SPECS[a].cost;
+      && g->money >= ability_cost(g, a);
 }
 
 bool ability_use(Game *g, Ability a, Vec p) {
   if (!ability_ready(g, a)) return false;
   const AbilitySpec *s = &ABILITY_SPECS[a];
-  g->money -= s->cost;
-  g->ab_cooldown_ms[a] = s->cooldown_ms;
+  g->money -= ability_cost(g, a);
+  g->ab_cooldown_ms[a] = ability_cooldown(g, a);
   switch (a) {
     case AB_AIR:   g->air_active = 1; g->air_point = p; g->air_timer_ms = (int16_t)s->duration_ms; break;
     case AB_EW:    g->ew_point = p; g->ew_ms = (int16_t)s->duration_ms; break;

@@ -18,13 +18,16 @@
  *     hinge on the seed (raid side vs. where the bot happens to put its towers);
  *   - no seed reaches MAX_NIGHTS, and an idle player (no towers, no abilities) loses on nights 1-3.
  * Reference with DIFFICULTY_SPECS[DIFF_NORMAL].start_money 500 over 1000 seeds: mean 15.6, Q1 14, median 18, 1.2% lost by night 5.
- * At DIFFICULTY_SPECS[DIFF_NORMAL].start_money 400 it was mean 8.3, Q1 5, median 6, 12.8% lost by night 5. */
+ * At DIFFICULTY_SPECS[DIFF_NORMAL].start_money 400 it was mean 8.3, Q1 5, median 6, 12.8% lost by night 5.
+ * Plant roles with a random second unit, 60 seeds: Normal mean 16.3, Q1 12, median 18, 2 lost by night 5;
+ * by start unit Tank Farm A 16.3, Tank Farm B 16.0, Loading Terminal 17.0, Cracking Unit 17.7. */
 #define SEEDS 60
 #define BAL_MEAN_MIN 11
 #define BAL_MEAN_MAX 20
 #define BAL_Q1_MIN 6
 #define BAL_EARLY_NIGHT 5
 #define BAL_EARLY_MAX (SEEDS / 20)   /* 5% */
+#define BAL_START_GAP 3       /* mean nights per second plant unit at most this far from Normal's */
 #define BAL_DIFF_GAP 3        /* Easy / Hard mean nights at least this far from Normal */
 #define BAL_EASY_IDLE_MAX 5   /* an idle player on Easy loses by this night */
 #define MAX_NIGHTS 60
@@ -71,9 +74,7 @@ static int ring_free(const Game *g, ObjectId o, int *oc, int *or_) {
 static void bot_morning(Game *g) {
   for (int o = 0; o < OBJ_COUNT; o++)
     if (g->objects[o].status == OBJ_ALIVE && g->objects[o].hp < 60) object_action(g, (ObjectId)o);
-  for (int i = 0; i < MAX_TOWERS; i++)
-    if (g->towers[i].active && (g->towers[i].type == TW_TOR || g->towers[i].type == TW_PATRIOT))
-      tower_reload(g, i);
+  reload_all(g);
   int c, r;
   if (!has_radar(g) && nearest_free(g, 8, 9, &c, &r)) tower_buy(g, TW_RADAR, c, r);
   int turn = 0, obj = 0, fails = 0;
@@ -81,10 +82,10 @@ static void bot_morning(Game *g) {
     while (g->objects[obj % OBJ_COUNT].status != OBJ_ALIVE) obj++;
     ObjectId o = (ObjectId)(obj % OBJ_COUNT); obj++;
     TowerType t = (turn & 1) ? TW_TOR : TW_GEPARD;
-    if (t == TW_TOR && g->money < TOWER_SPECS[TW_TOR].cost) t = TW_GEPARD;
+    if (t == TW_TOR && g->money < tower_price(g, TW_TOR)) t = TW_GEPARD;
     if (ring_free(g, o, &c, &r) && tower_buy(g, t, c, r) == ACT_OK) { turn++; fails = 0; }
     else fails++;
-    if (g->money < TOWER_SPECS[TW_GEPARD].cost) break;
+    if (g->money < tower_price(g, TW_GEPARD)) break;
   }
 }
 
@@ -108,9 +109,11 @@ static void bot_night(Game *g) {
   }
 }
 
-/* Returns nights survived (capped at MAX_NIGHTS); *lost_night = g.night at game over, 0 if none. */
-static int run(uint32_t seed, int smart, Difficulty d, int *lost_night) {
-  Game g; game_new(&g, seed, d);
+/* Returns nights survived (capped at MAX_NIGHTS); *lost_night = g.night at game over, 0 if none.
+ * start < 0: random second plant unit, as in a real game; otherwise that unit. */
+static int run_start(uint32_t seed, int smart, Difficulty d, int start, int *lost_night) {
+  Game g;
+  if (start < 0) game_new(&g, seed, d); else game_new_start(&g, seed, d, (ObjectId)start);
   *lost_night = 0;
   while (g.night <= MAX_NIGHTS) {
     if (smart) bot_morning(&g);
@@ -125,6 +128,10 @@ static int run(uint32_t seed, int smart, Difficulty d, int *lost_night) {
     report_ack(&g);
   }
   return nights_survived(&g);
+}
+
+static int run(uint32_t seed, int smart, Difficulty d, int *lost_night) {
+  return run_start(seed, smart, d, -1, lost_night);
 }
 
 typedef struct { int mean_x100, q1, early, capped, idle_best, idle_worst; } BalStats;
@@ -169,8 +176,9 @@ static void test_balance(void) {
 }
 
 /* Easy and Hard must stay ordered around Normal by a clear margin, and still end. Reference over 60 seeds:
- * Easy ($600, waves 70%) mean 22.5, Q1 22, 0 lost by night 5; Hard ($500, waves 160%) mean 10.5, Q1 6,
- * median 13, 4 lost by night 5. Hard with $450 and waves 140% lost 12 of 60 by night 5. */
+ * Easy ($600, waves 70%) mean 22.8, Q1 22, 0 lost by night 5; Hard ($500, waves 160%) mean 9.5, Q1 6,
+ * median 8, 2 lost by night 5 (before plant roles: Easy 22.5, Hard 10.5). Hard with $450 and waves 140%
+ * lost 12 of 60 by night 5. */
 static void test_difficulties(void) {
   BalStats n = s_normal, e = measure(DIFF_EASY), h = measure(DIFF_HARD);
   CHECK(e.mean_x100 >= n.mean_x100 + BAL_DIFF_GAP * 100);
@@ -182,8 +190,23 @@ static void test_difficulties(void) {
   CHECK(h.idle_worst <= 3);
 }
 
+/* Every second plant unit (they bring different roles) is a fair start on Normal. */
+static void test_start_units(void) {
+  printf("Normal: bot mean by start unit:");
+  for (int o = OBJ_TANK_A; o < OBJ_COUNT; o++) {
+    int sum = 0, lost;
+    for (int s = 0; s < SEEDS; s++) sum += run_start((uint32_t)(s + 1), 1, DIFF_NORMAL, o, &lost);
+    int mean_x100 = sum * 100 / SEEDS;
+    printf(" %s %.2f", OBJECT_SPECS[o].name, (double)sum / SEEDS);
+    CHECK(mean_x100 >= s_normal.mean_x100 - BAL_START_GAP * 100);
+    CHECK(mean_x100 <= s_normal.mean_x100 + BAL_START_GAP * 100);
+  }
+  printf("\n");
+}
+
 int main(void) {
   RUN(test_balance);
+  RUN(test_start_units);
   RUN(test_difficulties);
   return TEST_SUMMARY();
 }

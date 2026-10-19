@@ -18,18 +18,18 @@ static void put_drone(Game *g, int i, int type, Vec pos, Vec dest, uint16_t uid)
 static Vec at(int x, int y) { Vec v = {x * FX, y * FX}; return v; }
 
 static void test_engage_range(void) {
-  Game g; game_new(&g, 1, DIFF_NORMAL); g.money = 1000;
+  Game g; game_new_start(&g, 1, DIFF_NORMAL, OBJ_TANK_A); g.money = 1000;
   CHECK_EQ(tower_buy(&g, TW_MG, 5, 5), ACT_OK);             /* center (66,66) */
   CHECK_EQ(tower_engage_range(&g, 0), 13 * FX);
   CHECK_EQ(tower_buy(&g, TW_RADAR, 6, 5), ACT_OK);
   CHECK_EQ(tower_engage_range(&g, 0), 22 * FX);
-  Game h; game_new(&h, 1, DIFF_NORMAL); h.money = 1000;
+  Game h; game_new_start(&h, 1, DIFF_NORMAL, OBJ_TANK_A); h.money = 1000;
   tower_buy(&h, TW_PATRIOT, 5, 5);
   CHECK_EQ(tower_engage_range(&h, 0), 48 * FX);             /* 80*60/100 */
 }
 
 static void test_mg_kills_switchblade(void) {
-  Game g; game_new(&g, 1, DIFF_NORMAL); g.money = 1000;
+  Game g; game_new_start(&g, 1, DIFF_NORMAL, OBJ_TANK_A); g.money = 1000;
   tower_buy(&g, TW_MG, 5, 5);
   g.money = 0;
   put_drone(&g, 0, DR_SWITCHBLADE, at(70, 66), at(70, 200), 1);
@@ -56,7 +56,7 @@ static void test_mg_kills_switchblade(void) {
 }
 
 static void test_visibility(void) {
-  Game g; game_new(&g, 1, DIFF_NORMAL); g.money = 1000;
+  Game g; game_new_start(&g, 1, DIFF_NORMAL, OBJ_TANK_A); g.money = 1000;
   put_drone(&g, 0, DR_GERBERA, at(100, 92), at(100, 200), 1);
   CHECK(!drone_visible(&g, 0));
   tower_buy(&g, TW_MG, 8, 7);                               /* center (102,90) */
@@ -74,7 +74,7 @@ static void test_visibility(void) {
 }
 
 static void test_range_boundary(void) {
-  Game g; game_new(&g, 1, DIFF_NORMAL); g.money = 1000;
+  Game g; game_new_start(&g, 1, DIFF_NORMAL, OBJ_TANK_A); g.money = 1000;
   tower_buy(&g, TW_MG, 5, 5);                               /* center (66,66), engage 13 */
   Vec c = at(66, 66);
   Vec p = {c.x + 13 * FX, c.y + 1};                         /* floor dist == 13*FX: in range */
@@ -89,7 +89,7 @@ static void test_range_boundary(void) {
 }
 
 static void test_engage_cache(void) {
-  Game g; game_new(&g, 1, DIFF_NORMAL); g.money = 100000;
+  Game g; game_new_start(&g, 1, DIFF_NORMAL, OBJ_TANK_A); g.money = 100000;
   CHECK_EQ(tower_buy(&g, TW_MG, 5, 5), ACT_OK);
   CHECK_EQ(tower_buy(&g, TW_RADAR, 6, 5), ACT_OK);
   CHECK_EQ(tower_buy(&g, TW_PATRIOT, 14, 17), ACT_OK);     /* far from the radar */
@@ -112,14 +112,14 @@ static void test_engage_cache(void) {
 }
 
 static void test_tor_gerbera(void) {
-  Game g; game_new(&g, 1, DIFF_NORMAL); g.money = 1000;
+  Game g; game_new_start(&g, 1, DIFF_NORMAL, OBJ_TANK_A); g.money = 1000;
   tower_buy(&g, TW_TOR, 5, 5);
   tower_buy(&g, TW_RADAR, 6, 6);
   put_drone(&g, 0, DR_GERBERA, at(80, 66), at(80, 200), 1);
   for (int i = 0; i < 10; i++) combat_update(&g, 500);
   CHECK_EQ(g.towers[0].ammo, 6);
   for (int i = 0; i < MAX_MISSILES; i++) CHECK(!g.missiles[i].active);
-  Game h; game_new(&h, 1, DIFF_NORMAL); h.money = 1000;
+  Game h; game_new_start(&h, 1, DIFF_NORMAL, OBJ_TANK_A); h.money = 1000;
   tower_buy(&h, TW_TOR, 5, 5);
   put_drone(&h, 0, DR_GERBERA, at(80, 66), at(80, 200), 1);
   combat_update(&h, 40);
@@ -129,7 +129,7 @@ static void test_tor_gerbera(void) {
 }
 
 static void test_patriot_ammo(void) {
-  Game g; game_new(&g, 1, DIFF_NORMAL); g.money = 1000;
+  Game g; game_new_start(&g, 1, DIFF_NORMAL, OBJ_TANK_A); g.money = 1000;
   tower_buy(&g, TW_PATRIOT, 5, 5);
   put_drone(&g, 0, DR_SHAHED136, at(70, 66), at(70, 200), 1);
   g.drones[0].hp = 200;                                     /* survives */
@@ -144,7 +144,7 @@ static void test_patriot_ammo(void) {
 }
 
 static void test_missile_hit_and_stale(void) {
-  Game g; game_new(&g, 1, DIFF_NORMAL); g.money = 1000;
+  Game g; game_new_start(&g, 1, DIFF_NORMAL, OBJ_TANK_A); g.money = 1000;
   tower_buy(&g, TW_TOR, 5, 5);
   put_drone(&g, 0, DR_SHAHED136, at(86, 66), at(86, 200), 7);
   combat_update(&g, 40);
@@ -156,7 +156,7 @@ static void test_missile_hit_and_stale(void) {
   CHECK(!g.missiles[0].active);
   CHECK_EQ(g.drones[0].hp, hp);                             /* untouched */
   /* real hit: Tor damage 6 kills Shahed-136 (hp 6) */
-  Game h; game_new(&h, 1, DIFF_NORMAL); h.money = 1000;
+  Game h; game_new_start(&h, 1, DIFF_NORMAL, OBJ_TANK_A); h.money = 1000;
   tower_buy(&h, TW_TOR, 5, 5);
   put_drone(&h, 0, DR_SHAHED136, at(86, 66), at(86, 200), 7);
   h.money = 0;
@@ -166,7 +166,7 @@ static void test_missile_hit_and_stale(void) {
 }
 
 static void test_target_choice(void) {
-  Game g; game_new(&g, 1, DIFF_NORMAL); g.money = 1000;
+  Game g; game_new_start(&g, 1, DIFF_NORMAL, OBJ_TANK_A); g.money = 1000;
   tower_buy(&g, TW_MG, 5, 5);                               /* center (66,66) */
   put_drone(&g, 0, DR_SHAHED136, at(70, 66), at(70, 150), 1);   /* far from goal */
   put_drone(&g, 1, DR_SHAHED136, at(66, 72), at(66, 80), 2);    /* close to goal */
@@ -176,7 +176,7 @@ static void test_target_choice(void) {
 }
 
 static void test_pool_full(void) {
-  Game g; game_new(&g, 1, DIFF_NORMAL); g.money = 1000;
+  Game g; game_new_start(&g, 1, DIFF_NORMAL, OBJ_TANK_A); g.money = 1000;
   tower_buy(&g, TW_TOR, 5, 5);
   for (int i = 0; i < MAX_MISSILES; i++) { g.missiles[i].active = 1; g.missiles[i].drone_uid = 1; }
   put_drone(&g, 0, DR_SHAHED136, at(86, 66), at(86, 200), 1);
@@ -186,7 +186,7 @@ static void test_pool_full(void) {
 }
 
 static void test_flare_detects(void) {
-  Game g; game_new(&g, 1, DIFF_NORMAL); g.money = 1000;
+  Game g; game_new_start(&g, 1, DIFF_NORMAL, OBJ_TANK_A); g.money = 1000;
   tower_buy(&g, TW_MG, 8, 7);                               /* center (102,90), no radar */
   CHECK_EQ(tower_engage_range(&g, 0), 22 * DETECT_PCT / 100 * FX);
   put_drone(&g, 0, DR_GERBERA, at(140, 90), at(140, 200), 1);
@@ -200,7 +200,7 @@ static void test_flare_detects(void) {
 }
 
 static void test_combo(void) {
-  Game g; game_new(&g, 1, DIFF_NORMAL);
+  Game g; game_new_start(&g, 1, DIFF_NORMAL, OBJ_TANK_A);
   CHECK_EQ(combo_pct(1), 100); CHECK_EQ(combo_pct(COMBO_X15_AT), 150); CHECK_EQ(combo_pct(COMBO_X2_AT), 200);
   int32_t paid = 0;
   for (int k = 0; k < 7; k++) {                             /* 7 Harpies ($10) in a row */
@@ -226,7 +226,29 @@ static void test_combo(void) {
   CHECK_EQ(g.combo_ms, COMBO_WINDOW_MS);
 }
 
+static void test_combo_needs_tank_a(void) {
+  Game g; game_new_start(&g, 1, DIFF_NORMAL, OBJ_TANK_B);    /* no Tank Farm A: no streak */
+  for (int k = 0; k < 6; k++) {
+    put_drone(&g, k, DR_HARPY, at(50, 50), at(50, 200), (uint16_t)(k + 1));
+    kill_drone(&g, k);
+  }
+  CHECK_EQ(g.money, DIFFICULTY_SPECS[DIFF_NORMAL].start_money + 60);
+  CHECK_EQ(g.combo, 0); CHECK_EQ(g.stats.best_combo, 0);
+  Game h; game_new_start(&h, 1, DIFF_NORMAL, OBJ_TANK_A);    /* Tank Farm A lost mid-streak */
+  for (int k = 0; k < 3; k++) {
+    put_drone(&h, k, DR_HARPY, at(50, 50), at(50, 200), (uint16_t)(k + 1));
+    kill_drone(&h, k);
+  }
+  CHECK_EQ(h.combo, 3);
+  h.objects[OBJ_TANK_A].status = OBJ_DESTROYED; h.objects[OBJ_TANK_A].hp = 0;
+  int32_t before = h.money;
+  put_drone(&h, 3, DR_HARPY, at(50, 50), at(50, 200), 4);
+  kill_drone(&h, 3);
+  CHECK_EQ(h.money - before, 10); CHECK_EQ(h.combo, 0); CHECK_EQ(h.stats.best_combo, 3);
+}
+
 int main(void) {
+  RUN(test_combo_needs_tank_a);
   RUN(test_flare_detects);
   RUN(test_combo);
   RUN(test_engage_range);

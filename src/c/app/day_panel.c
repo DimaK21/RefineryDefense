@@ -42,7 +42,9 @@ static int prv_buttons(const Game *g, int16_t width, Btn *out) {
                      : g->objects[s_idx].status == OBJ_DESTROYED ? "Rebuild" : "Repair";
     int32_t cost = object_action_cost(g, (ObjectId)s_idx);
     Btn *b = &out[n++];
-    b->act = BTN_OBJECT; b->top = OBJECT_SPECS[s_idx].name; b->w = width - CLOSE_W;
+    /* the role is what tells units apart; the centre has none, so it shows its name */
+    const char *role = OBJECT_SPECS[s_idx].role;
+    b->act = BTN_OBJECT; b->top = role ? role : OBJECT_SPECS[s_idx].name; b->w = width - CLOSE_W;
     b->enabled = cost > 0; b->poor = cost > g->money;
     snprintf(b->bottom, sizeof(b->bottom), "%s $%ld", verb, (long)cost);
     out[n] = (Btn){BTN_CLOSE, "X", "", CLOSE_W, true, false}; n++;

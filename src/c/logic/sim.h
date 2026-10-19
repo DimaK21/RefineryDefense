@@ -5,6 +5,8 @@ bool     night_begin(Game *g);
 void     sim_tick(Game *g, uint16_t dt_ms);
 /* Night only: ready = off cooldown and affordable. ability_use pays, starts the cooldown and
  * the effect at p; false (nothing spent) if not ready. */
+int32_t  ability_cost(const Game *g, Ability a);       /* Cracking Unit discount */
+uint16_t ability_cooldown(const Game *g, Ability a);   /* Cracking Unit discount */
 bool     ability_ready(const Game *g, Ability a);
 bool     ability_use(Game *g, Ability a, Vec p);
 uint32_t sim_take_events(Game *g);

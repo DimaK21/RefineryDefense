@@ -8,7 +8,7 @@
 static int32_t absi(int32_t v) { return v < 0 ? -v : v; }
 
 static void test_object_hit(void) {
-  Game g; game_new(&g, 5, DIFF_NORMAL); WaveEntry e = {0, DR_SHAHED136, 0};
+  Game g; game_new_start(&g, 5, DIFF_NORMAL, OBJ_TANK_A); WaveEntry e = {0, DR_SHAHED136, 0};
   CHECK(drone_spawn(&g, &e));
   CHECK(g.drones[0].active);
   CHECK_EQ(g.drones[0].uid, 1);
@@ -27,7 +27,7 @@ static void test_object_hit(void) {
 }
 
 static void test_object_destroyed(void) {
-  Game g; game_new(&g, 5, DIFF_NORMAL); WaveEntry e = {0, DR_SHAHED136, 0};
+  Game g; game_new_start(&g, 5, DIFF_NORMAL, OBJ_TANK_A); WaveEntry e = {0, DR_SHAHED136, 0};
   g.objects[OBJ_DISTILLATION].hp = 20; g.objects[OBJ_TANK_A].hp = 20;
   CHECK(drone_spawn(&g, &e));
   int t = g.drones[0].target_idx;
@@ -38,7 +38,7 @@ static void test_object_destroyed(void) {
 }
 
 static void test_wobble(void) {
-  Game g; game_new(&g, 7, DIFF_NORMAL); WaveEntry e = {0, DR_SHAHED136, 1};
+  Game g; game_new_start(&g, 7, DIFF_NORMAL, OBJ_TANK_A); WaveEntry e = {0, DR_SHAHED136, 1};
   CHECK(drone_spawn(&g, &e));
   int differs = 0; int32_t maxoff = 0; uint8_t amp = g.drones[0].amp;
   CHECK(amp >= WOBBLE_AMP_MIN && amp <= WOBBLE_AMP_MAX);
@@ -64,7 +64,7 @@ static void put_drone(Game *g, int i, int type, Vec track, Vec far) {
 }
 
 static void test_jammer(void) {
-  Game g; game_new(&g, 3, DIFF_NORMAL); g.money = 1000;
+  Game g; game_new_start(&g, 3, DIFF_NORMAL, OBJ_TANK_A); g.money = 1000;
   CHECK_EQ(tower_buy(&g, TW_JAMMER, 1, 1), ACT_OK);          /* center (18,18) */
   Vec a = {18 * FX, 18 * FX}, b = {18 * FX, 150 * FX};
   Vec fa = {118 * FX, 18 * FX}, fb = {118 * FX, 150 * FX};
@@ -79,7 +79,7 @@ static void test_jammer(void) {
 }
 
 static void test_harpy_radar(void) {
-  Game g; game_new(&g, 9, DIFF_NORMAL); g.money = 1000;
+  Game g; game_new_start(&g, 9, DIFF_NORMAL, OBJ_TANK_A); g.money = 1000;
   tower_buy(&g, TW_GEPARD, 8, 1);                            /* near the top edge */
   tower_buy(&g, TW_RADAR, 13, 17);                           /* far away */
   int radar = tower_at(&g, 13, 17);
@@ -93,18 +93,18 @@ static void test_harpy_radar(void) {
 }
 
 static void test_harpy_fallbacks(void) {
-  Game g; game_new(&g, 9, DIFF_NORMAL); g.money = 1000;
+  Game g; game_new_start(&g, 9, DIFF_NORMAL, OBJ_TANK_A); g.money = 1000;
   tower_buy(&g, TW_MG, 8, 1);
   WaveEntry e = {0, DR_HARPY, 0};
   CHECK(drone_spawn(&g, &e));
   CHECK_EQ(g.drones[0].target_kind, TGT_TOWER);              /* no radar: nearest tower */
-  Game h; game_new(&h, 9, DIFF_NORMAL);
+  Game h; game_new_start(&h, 9, DIFF_NORMAL, OBJ_TANK_A);
   CHECK(drone_spawn(&h, &e));
   CHECK_EQ(h.drones[0].target_kind, TGT_OBJECT);             /* no towers: object */
 }
 
 static void test_pool(void) {
-  Game g2; game_new(&g2, 11, DIFF_NORMAL); WaveEntry e = {0, DR_SHAHED136, 0};
+  Game g2; game_new_start(&g2, 11, DIFF_NORMAL, OBJ_TANK_A); WaveEntry e = {0, DR_SHAHED136, 0};
   for (int i = 0; i < MAX_DRONES; i++) CHECK(drone_spawn(&g2, &e));
   Game before = g2;
   CHECK(!drone_spawn(&g2, &e));
@@ -113,7 +113,7 @@ static void test_pool(void) {
 }
 
 static void test_no_target(void) {
-  Game g; game_new(&g, 2, DIFF_NORMAL); WaveEntry e = {0, DR_SHAHED136, 2};
+  Game g; game_new_start(&g, 2, DIFF_NORMAL, OBJ_TANK_A); WaveEntry e = {0, DR_SHAHED136, 2};
   g.objects[OBJ_DISTILLATION].status = OBJ_DESTROYED;
   g.objects[OBJ_TANK_A].status = OBJ_DESTROYED;
   CHECK(drone_spawn(&g, &e));
@@ -121,7 +121,7 @@ static void test_no_target(void) {
 }
 
 static void test_retarget(void) {
-  Game g; game_new(&g, 4, DIFF_NORMAL); g.money = 1000;
+  Game g; game_new_start(&g, 4, DIFF_NORMAL, OBJ_TANK_A); g.money = 1000;
   tower_buy(&g, TW_MG, 0, 0);
   Vec start = {100 * FX, 0}, far = tower_center(&g.towers[0]);
   put_drone(&g, 0, DR_SWITCHBLADE, start, far);
@@ -142,7 +142,7 @@ static void test_retarget(void) {
 }
 
 static void test_tower_lost(void) {
-  Game g; game_new(&g, 4, DIFF_NORMAL); g.money = 1000;
+  Game g; game_new_start(&g, 4, DIFF_NORMAL, OBJ_TANK_A); g.money = 1000;
   tower_buy(&g, TW_MG, 5, 5);
   Vec c = tower_center(&g.towers[0]);
   g.towers[0].hp = 1;
@@ -164,7 +164,7 @@ static void test_centers(void) {
 }
 
 static void test_ew_pulse_slows(void) {
-  Game g; game_new(&g, 5, DIFF_NORMAL); WaveEntry e = {0, DR_SHAHED136, 0};
+  Game g; game_new_start(&g, 5, DIFF_NORMAL, OBJ_TANK_A); WaveEntry e = {0, DR_SHAHED136, 0};
   CHECK(drone_spawn(&g, &e));
   Game h = g;
   h.ew_point = h.drones[0].track; h.ew_ms = 30000;           /* pulse right on the drone */

@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include "config.h"
 
 const TowerSpec TOWER_SPECS[TW_COUNT] = {
@@ -38,10 +39,10 @@ const DifficultySpec DIFFICULTY_SPECS[DIFF_COUNT] = {
 };
 
 const ObjectSpec OBJECT_SPECS[OBJ_COUNT] = {
-  /*                       name                income cost col row */
-  [OBJ_DISTILLATION] = {"Distillation Column", 30, 180,  7,  8},
-  [OBJ_TANK_A]       = {"Tank Farm A",         20, 120,  3, 12},
-  [OBJ_TANK_B]       = {"Tank Farm B",         20, 120, 11,  4},
-  [OBJ_TERMINAL]     = {"Loading Terminal",    25, 150, 11, 13},
-  [OBJ_CRACKER]      = {"Cracking Unit",       40, 250,  3,  4},
+  /*                       name                income cost col row role */
+  [OBJ_DISTILLATION] = {"Distillation Column", 30, 180,  7,  8, NULL},
+  [OBJ_TANK_A]       = {"Tank Farm A",         20, 120,  3, 12, "Combo x2"},
+  [OBJ_TANK_B]       = {"Tank Farm B",         20, 120, 11,  4, "Missiles -50%"},
+  [OBJ_TERMINAL]     = {"Loading Terminal",    25, 150, 11, 13, "Towers -15%"},
+  [OBJ_CRACKER]      = {"Cracking Unit",       40, 250,  3,  4, "Abilities -30%"},
 };

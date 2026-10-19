@@ -21,10 +21,10 @@ static const Page PAGES[] = {
    "drones come from. Tap the green arrow twice to start.", false},
   {"Night",
    "Towers fire on their own. You only see drones near your towers, radars and flares.\n"
-   "Quick kills in a row make a combo: x1.5 bounty from 3, x2 from 6.\n"
+   "With Tank Farm A alive, quick kills in a row make a combo: x1.5 bounty from 3, x2 from 6.\n"
    "Select: x2 speed. Back: pause.", true},
   {"Abilities",
-   "Up/Down: pick one. Tap the map to aim, tap the mark to use.\n"
+   "Up/Down: pick one, a card says what it does. Tap the map to aim, tap the mark to use.\n"
    "Air Strike $60: wipes out drones\n"
    "EW Pulse $25: slows drones\n"
    "Flare $15: lights an area, towers in it get full range\n"
@@ -32,7 +32,7 @@ static const Page PAGES[] = {
   {"Towers",
    "MG Nest: cheap, short range\n"
    "Gepard: solid all-rounder\n"
-   "Tor, Patriot: missiles; buy reloads by day\n"
+   "Tor, Patriot: missiles; the Reload button refills all by day\n"
    "Jammer: slows drones down\n"
    "Radar: towers in its circle shoot at full range, outside only 60%. "
    "Reveals decoys.", true},
@@ -46,6 +46,12 @@ static const Page PAGES[] = {
   {"Money",
    "Each morning living plant units pay income by health. More units, more money, "
    "but bigger raids.", false},
+  {"Plant units",
+   "You start with the centre and one random unit. Each other unit gives a bonus while alive:\n"
+   "Tank Farm A: combo\n"
+   "Tank Farm B: missiles -50%\n"
+   "Terminal: towers -15%\n"
+   "Cracking Unit: abilities -30% price and recharge", true},
 };
 #define PAGE_COUNT ((int)ARRAY_LENGTH(PAGES))
 

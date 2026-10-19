@@ -22,6 +22,8 @@
 #define MINI_H 44
 #define MINI_MARGIN 2
 #define RAID_EDGE_PX 2    /* minimap edge stripe for a raid side */
+#define RELOAD_W 46       /* "Reload all" button, bottom-left of the map, mirrors the minimap */
+#define RELOAD_H 30
 #define START_CONFIRM_MS 2000   /* UI tuning: a second Start tap / Select within this starts the night */
 
 static Window *s_window;
@@ -52,6 +54,15 @@ static GRect prv_bar_rect(void) {
 static GRect prv_mini_rect(void) {
   return GRect(s_bounds.size.w - MINI_W - MINI_MARGIN, s_bounds.size.h - BAR_H - MINI_H - MINI_MARGIN,
                MINI_W, MINI_H);
+}
+
+static GRect prv_reload_rect(void) {
+  return GRect(MINI_MARGIN, s_bounds.size.h - BAR_H - RELOAD_H - MINI_MARGIN, RELOAD_W, RELOAD_H);
+}
+
+/* Only when some Tor / Patriot lacks missiles and a map tap means nothing else. */
+static bool prv_reload_shown(const Game *g) {
+  return !s_move && !s_start_armed && day_panel_kind() == PANEL_NONE && reload_all_cost(g) > 0;
 }
 
 static void prv_dirty(void) {
@@ -146,11 +157,27 @@ static void prv_draw_bar(GContext *ctx, const Game *g) {
     graphics_context_set_stroke_color(ctx, GColorBlack);
     graphics_draw_rect(ctx, slot);
     render_tower_icon(ctx, t, GRect(slot.origin.x + (SLOT_W - 12) / 2, slot.origin.y + 2, 12, 12));
-    snprintf(buf, sizeof(buf), "%u", (unsigned)TOWER_SPECS[t].cost);
+    int32_t price = tower_price(g, (TowerType)t);
+    snprintf(buf, sizeof(buf), "%ld", (long)price);
     prv_text(ctx, buf, GRect(slot.origin.x, slot.origin.y + 11, SLOT_W, 16), GTextAlignmentCenter,
-             g->money < TOWER_SPECS[t].cost ? COL_NO_MONEY : COL_BAR_TEXT);
+             g->money < price ? COL_NO_MONEY : COL_BAR_TEXT);
   }
   prv_draw_play(ctx, play);
+}
+
+static void prv_draw_reload(GContext *ctx, const Game *g) {
+  if (!prv_reload_shown(g)) return;
+  GRect r = prv_reload_rect();
+  graphics_context_set_fill_color(ctx, COL_BAR_BG);
+  graphics_fill_rect(ctx, r, 0, GCornerNone);
+  graphics_context_set_stroke_color(ctx, GColorBlack);
+  graphics_draw_rect(ctx, grect_inset(r, GEdgeInsets(-1)));
+  int32_t cost = reload_all_cost(g);
+  char buf[12];
+  snprintf(buf, sizeof(buf), "$%ld", (long)cost);
+  prv_text(ctx, "Reload", GRect(r.origin.x, r.origin.y - 2, r.size.w, 16), GTextAlignmentCenter, COL_BAR_TEXT);
+  prv_text(ctx, buf, GRect(r.origin.x, r.origin.y + 12, r.size.w, 16), GTextAlignmentCenter,
+           g->money < cost ? COL_NO_MONEY : COL_HUD_MONEY);
 }
 
 static GPoint prv_mini_pt(GRect m, int wx, int wy) {
@@ -208,6 +235,7 @@ static void prv_ui_update(Layer *layer, GContext *ctx) {
   if (day_panel_kind() != PANEL_NONE) day_panel_draw(ctx, prv_bar_rect(), g);
   else prv_draw_bar(ctx, g);
   prv_draw_minimap(ctx, g);
+  prv_draw_reload(ctx, g);
 }
 
 /* ---- input ---- */
@@ -290,6 +318,12 @@ static void prv_tap(int16_t x, int16_t y) {
     } else {
       day_panel_close();
     }
+    return;
+  }
+  GRect reload = prv_reload_rect();
+  if (prv_reload_shown(g) && grect_contains_point(&reload, &p)) {
+    if (reload_all(g) == ACT_NO_MONEY) feedback_short();
+    s_ghost = false;
     return;
   }
   bool on_map = grect_contains_point(&map, &p) && !grect_contains_point(&mini, &p);

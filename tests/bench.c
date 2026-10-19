@@ -23,7 +23,7 @@ static double now_ns(void) {
 
 static void setup(void) {
   static const TowerType mix[] = {TW_MG, TW_GEPARD, TW_TOR, TW_PATRIOT, TW_MG, TW_GEPARD, TW_JAMMER, TW_RADAR};
-  game_new(&s_base, 1, DIFF_NORMAL);
+  game_new_start(&s_base, 1, DIFF_NORMAL, OBJ_TANK_A);
   s_base.money = 1000000;
   int n = 0, k = 0;
   for (int r = 1; r < GRID_ROWS - 1 && n < 30; r += 2)

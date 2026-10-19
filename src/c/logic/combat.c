@@ -1,5 +1,6 @@
 #include "combat.h"
 #include "config.h"
+#include "economy.h"
 #include "fx.h"
 
 static bool is_firing(const TowerSpec *s) { return s->period_ms > 0 && s->damage > 0; }
@@ -57,10 +58,14 @@ int combo_pct(uint16_t combo) {
 
 void kill_drone(Game *g, int d) {
   Drone *dr = &g->drones[d];
-  if (g->combo_ms == 0) g->combo = 0;   /* streak window over (combat without sim_tick, e.g. tests) */
-  if (g->combo < UINT16_MAX) g->combo++;
-  g->combo_ms = COMBO_WINDOW_MS;
-  if (g->combo > g->stats.best_combo) g->stats.best_combo = g->combo;
+  if (!object_alive(g, OBJ_ROLE_COMBO)) {   /* streaks are Tank Farm A's role */
+    g->combo = 0; g->combo_ms = 0;
+  } else {
+    if (g->combo_ms == 0) g->combo = 0;   /* streak window over (combat without sim_tick, e.g. tests) */
+    if (g->combo < UINT16_MAX) g->combo++;
+    g->combo_ms = COMBO_WINDOW_MS;
+    if (g->combo > g->stats.best_combo) g->stats.best_combo = g->combo;
+  }
   int32_t bounty = DRONE_SPECS[dr->type].bounty * combo_pct(g->combo) / 100;
   g->money += bounty; g->score += (uint32_t)bounty;
   g->stats.kills++; g->stats.bounty += bounty;

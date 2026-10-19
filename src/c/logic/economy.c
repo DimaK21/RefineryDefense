@@ -3,7 +3,7 @@
 #include "config.h"
 #include "rng.h"
 
-void game_new(Game *g, uint32_t seed, Difficulty d) {
+void game_new_start(Game *g, uint32_t seed, Difficulty d, ObjectId second) {
   memset(g, 0, sizeof(*g));
   g->rng = seed ? seed : 1;
   g->seed = rng_next(&g->rng);
@@ -13,8 +13,27 @@ void game_new(Game *g, uint32_t seed, Difficulty d) {
   g->money = DIFFICULTY_SPECS[g->difficulty].start_money;
   g->objects[OBJ_DISTILLATION].status = OBJ_ALIVE;
   g->objects[OBJ_DISTILLATION].hp = OBJECT_MAX_HP;
-  g->objects[OBJ_TANK_A].status = OBJ_ALIVE;
-  g->objects[OBJ_TANK_A].hp = OBJECT_MAX_HP;
+  g->objects[second].status = OBJ_ALIVE;
+  g->objects[second].hp = OBJECT_MAX_HP;
+}
+
+void game_new(Game *g, uint32_t seed, Difficulty d) {
+  game_new_start(g, seed, d, OBJ_TANK_A);
+  g->objects[OBJ_TANK_A].status = OBJ_NOT_BUILT;
+  g->objects[OBJ_TANK_A].hp = 0;
+  ObjectId second = (ObjectId)rng_range(&g->rng, OBJ_TANK_A, OBJ_COUNT - 1);
+  g->objects[second].status = OBJ_ALIVE;
+  g->objects[second].hp = OBJECT_MAX_HP;
+}
+
+bool object_alive(const Game *g, ObjectId o) {
+  return (int)o < OBJ_COUNT && g->objects[o].status == OBJ_ALIVE;
+}
+
+int32_t discounted(int32_t cost, int off_pct) {
+  if (cost <= 0) return cost;
+  int32_t v = cost * (100 - off_pct) / 100;
+  return v < 1 ? 1 : v;
 }
 
 int alive_objects(const Game *g) {
@@ -48,6 +67,16 @@ bool cell_free(const Game *g, int col, int row) {
   return object_at(g, col, row) < 0 && tower_at(g, col, row) < 0;
 }
 
+int32_t tower_price(const Game *g, TowerType t) {
+  int32_t c = TOWER_SPECS[t].cost;
+  return object_alive(g, OBJ_ROLE_TOWERS) ? discounted(c, ROLE_TOWER_OFF_PCT) : c;
+}
+
+int32_t missile_price(const Game *g, TowerType t) {
+  int32_t c = TOWER_SPECS[t].ammo_price;
+  return object_alive(g, OBJ_ROLE_MISSILES) ? discounted(c, ROLE_MISSILE_OFF_PCT) : c;
+}
+
 ActResult tower_buy(Game *g, TowerType t, int col, int row) {
   if (g->phase != PHASE_DAY || (int)t >= TW_COUNT) return ACT_INVALID;
   if (!cell_free(g, col, row)) return ACT_BLOCKED;
@@ -56,8 +85,9 @@ ActResult tower_buy(Game *g, TowerType t, int col, int row) {
     if (!g->towers[i].active) { slot = i; break; }
   if (slot < 0) return ACT_BLOCKED;
   const TowerSpec *s = &TOWER_SPECS[t];
-  if (g->money < s->cost) return ACT_NO_MONEY;
-  g->money -= s->cost;
+  int32_t price = tower_price(g, t);
+  if (g->money < price) return ACT_NO_MONEY;
+  g->money -= price;
   Tower *tw = &g->towers[slot];
   memset(tw, 0, sizeof(*tw));
   tw->active = 1;
@@ -96,7 +126,8 @@ int32_t tower_repair_cost(const Game *g, int idx) {
   if (missing <= 0) return 0;
   int32_t num = (int32_t)s->cost * TOWER_REPAIR_PCT * missing;
   int32_t den = 100 * (int32_t)s->hp;
-  return (num + den - 1) / den;
+  int32_t cost = (num + den - 1) / den;
+  return object_alive(g, OBJ_ROLE_TOWERS) ? discounted(cost, ROLE_TOWER_OFF_PCT) : cost;
 }
 
 ActResult tower_repair(Game *g, int idx) {
@@ -113,7 +144,7 @@ int32_t tower_reload_cost(const Game *g, int idx) {
   if (!valid_tower(g, idx)) return 0;
   const TowerSpec *s = &TOWER_SPECS[g->towers[idx].type];
   if (s->ammo == 0 || g->towers[idx].ammo >= s->ammo) return 0;
-  return (int32_t)(s->ammo - g->towers[idx].ammo) * s->ammo_price;
+  return (int32_t)(s->ammo - g->towers[idx].ammo) * missile_price(g, (TowerType)g->towers[idx].type);
 }
 
 ActResult tower_reload(Game *g, int idx) {
@@ -124,6 +155,36 @@ ActResult tower_reload(Game *g, int idx) {
   g->money -= cost;
   g->towers[idx].ammo = TOWER_SPECS[g->towers[idx].type].ammo;
   return ACT_OK;
+}
+
+int32_t reload_all_cost(const Game *g) {
+  int32_t sum = 0;
+  for (int i = 0; i < MAX_TOWERS; i++) sum += tower_reload_cost(g, i);
+  return sum;
+}
+
+/* Tower with the lowest ammo share that lacks missiles and whose missile is affordable, -1 if none. */
+static int emptiest_tower(const Game *g) {
+  int best = -1;
+  for (int i = 0; i < MAX_TOWERS; i++) {
+    if (tower_reload_cost(g, i) <= 0 || missile_price(g, (TowerType)g->towers[i].type) > g->money) continue;
+    const Tower *t = &g->towers[i];
+    if (best < 0) { best = i; continue; }
+    const Tower *b = &g->towers[best];
+    if ((int)t->ammo * TOWER_SPECS[b->type].ammo < (int)b->ammo * TOWER_SPECS[t->type].ammo) best = i;
+  }
+  return best;
+}
+
+ActResult reload_all(Game *g) {
+  if (g->phase != PHASE_DAY || reload_all_cost(g) <= 0) return ACT_INVALID;
+  bool bought = false;
+  for (int i; (i = emptiest_tower(g)) >= 0; ) {
+    g->money -= missile_price(g, (TowerType)g->towers[i].type);
+    g->towers[i].ammo++;
+    bought = true;
+  }
+  return bought ? ACT_OK : ACT_NO_MONEY;
 }
 
 int32_t object_action_cost(const Game *g, ObjectId o) {
