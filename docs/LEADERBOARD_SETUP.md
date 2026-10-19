@@ -27,24 +27,27 @@
 
 Сброс по расписанию (Cron) и награды не настраивать.
 
-## 3. Stage и Live
+## 3. Окружение и ключ
 
-В LootLocker есть два окружения: Stage (тест) и Live (для игроков). Таблицы, созданные в Stage,
-в Live не видны. Если вверху консоли есть переключатель окружения, проверь, что всё из шагов 1–2
-сделано в **Live**, или выкати изменения из Stage в Live (кнопка Deploy/Publish, если консоль её
-показывает).
+С марта 2025 года у новых игр в LootLocker одно окружение, и консоль выдаёт только ключ вида
+`dev_…`. Это обычный рабочий ключ игры: с ним играют и настоящие игроки, `prod_`-ключа не будет.
+LootLocker советует для тестов завести отдельную игру. Для этого проекта хватит одной: тестовые
+записи можно удалить в консоли (Leaderboards → таблица → запись).
+
+(У старых игр бывают окружения Stage и Live: тогда `dev_` — Stage, `prod_` — Live, и в сборку
+для игроков идёт ключ Live.)
 
 ## 4. Вписать ключ в проект
 
-**Game Settings → API**: скопировать **Game Key** (рабочий ключ обычно начинается с `prod_`).
-Если там же указан адрес API вида `xxxx.api.lootlocker.io`, взять и его.
+**Game Settings → API**: скопировать **Game Key** и адрес API вида
+`https://xxxx.api.lootlocker.com`.
 
 Открыть [src/pkjs/lootlocker_config.js](../src/pkjs/lootlocker_config.js) и заполнить:
 
 ```js
 module.exports = {
-  gameKey: 'prod_...',             // Game Key из консоли
-  domain: 'api.lootlocker.io',     // или адрес из консоли, без https://
+  gameKey: 'dev_...',                         // Game Key из консоли
+  domain: 'https://xxxx.api.lootlocker.com',  // адрес из консоли, можно с https:// или без
   gameVersion: '1.4.0'
 };
 ```
@@ -60,5 +63,5 @@ module.exports = {
 5. В консоли LootLocker: Leaderboards → нужная таблица → в списке появилась запись.
 
 Если `Server error` остаётся — проверить по порядку: Guest Login включён, ключи таблиц ровно
-`easy`/`normal`/`hard`, Enable Game API Writes включён, ключ из того же окружения (Live), где
-созданы таблицы.
+`easy`/`normal`/`hard`, Enable Game API Writes включён, ключ и адрес API скопированы из этой же
+игры.

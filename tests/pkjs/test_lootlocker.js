@@ -218,5 +218,13 @@ test('names from the server are cut to the watch alphabet and 6 characters', fun
   assert.deepStrictEqual(r.rows, ['1|N CODE|3|3', '2|AB C|2|2']);
 });
 
+test('domain pasted as a full URL still builds the right address', function () {
+  var http = fakeHttp(baseRoutes());
+  var c = ll.createClient({ http: http, store: memStore(),
+    config: { gameKey: 'k', domain: 'https://abc.api.lootlocker.com/', gameVersion: '1' }, playerIdentifier: 'p' });
+  sync(function (cb) { c.table(1, '', cb); });
+  assert.strictEqual(http.log[0].url, 'https://abc.api.lootlocker.com/game/v2/session/guest');
+});
+
 console.log(passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

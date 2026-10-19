@@ -23,7 +23,9 @@ function row(it) {
 
 function createClient(opts) {
   var http = opts.http, store = opts.store, config = opts.config;
-  var base = 'https://' + config.domain + '/game';
+  // The console shows the API address as a URL; accept it pasted whole or as a bare host.
+  var host = String(config.domain || '').replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  var base = 'https://' + host + '/game';
 
   function login(cb) {
     http('POST', base + '/v2/session/guest', { 'Content-Type': 'application/json' },
