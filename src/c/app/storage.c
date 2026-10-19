@@ -68,3 +68,40 @@ void storage_set_best(Difficulty d, Best b) {
   }
   if (persist_exists(KEY_OLD_BEST)) persist_delete(KEY_OLD_BEST);
 }
+
+bool storage_name(char out[NAME_LEN + 1]) {
+  out[0] = '\0';
+  int n = persist_read_string(KEY_NAME, out, NAME_LEN + 1);
+  if (n <= 0 || !name_valid(out)) { out[0] = '\0'; return false; }
+  return true;
+}
+
+void storage_set_name(const char *name) {
+  char buf[NAME_LEN + 1];
+  strncpy(buf, name, NAME_LEN);
+  buf[NAME_LEN] = '\0';
+  name_trim(buf);
+  if (!name_valid(buf)) return;
+  persist_write_string(KEY_NAME, buf);
+}
+
+static void prv_read_sent(Best out[DIFF_COUNT]) {
+  memset(out, 0, sizeof(Best) * DIFF_COUNT);
+  if (persist_get_size(KEY_SENT_BESTS) == (int)(sizeof(Best) * DIFF_COUNT))
+    persist_read_data(KEY_SENT_BESTS, out, sizeof(Best) * DIFF_COUNT);
+}
+
+Best storage_sent_best(Difficulty d) {
+  Best all[DIFF_COUNT];
+  prv_read_sent(all);
+  return all[d < DIFF_COUNT ? d : DIFF_NORMAL];
+}
+
+void storage_set_sent_best(Difficulty d, Best b) {
+  if (d >= DIFF_COUNT) return;
+  Best all[DIFF_COUNT];
+  prv_read_sent(all);
+  all[d] = b;
+  int written = persist_write_data(KEY_SENT_BESTS, all, sizeof(all));
+  if (written != (int)sizeof(all)) APP_LOG(APP_LOG_LEVEL_ERROR, "sent best write failed: %d", written);
+}

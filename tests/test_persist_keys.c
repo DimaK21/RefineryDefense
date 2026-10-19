@@ -8,6 +8,8 @@ static void test_keys_distinct(void) {
   for (int i = 0; i < n; i++)
     for (int j = i + 1; j < n; j++) CHECK(keys[i] != keys[j]);
   CHECK(KEY_SOUND != KEY_BESTS);
+  CHECK(KEY_NAME != KEY_SENT_BESTS);
+  CHECK(KEY_NAME != KEY_BESTS && KEY_SENT_BESTS != KEY_BESTS);
 }
 
 int main(void) {
