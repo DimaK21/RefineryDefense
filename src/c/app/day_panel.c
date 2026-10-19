@@ -41,12 +41,18 @@ static int prv_buttons(const Game *g, int16_t width, Btn *out) {
     const char *verb = g->objects[s_idx].status == OBJ_NOT_BUILT ? "Build"
                      : g->objects[s_idx].status == OBJ_DESTROYED ? "Rebuild" : "Repair";
     int32_t cost = object_action_cost(g, (ObjectId)s_idx);
+    const char *name = OBJECT_SPECS[s_idx].name, *role = OBJECT_SPECS[s_idx].role;
     Btn *b = &out[n++];
-    /* the role is what tells units apart; the centre has none, so it shows its name */
-    const char *role = OBJECT_SPECS[s_idx].role;
-    b->act = BTN_OBJECT; b->top = role ? role : OBJECT_SPECS[s_idx].name; b->w = width - CLOSE_W;
-    b->enabled = cost > 0; b->poor = cost > g->money;
-    snprintf(b->bottom, sizeof(b->bottom), "%s $%ld", verb, (long)cost);
+    b->act = BTN_OBJECT; b->w = width - CLOSE_W;
+    if (cost <= 0) {
+      /* intact: nothing to buy, so name and role; a tap does nothing (object_action is ACT_INVALID) */
+      b->top = name; b->enabled = true; b->poor = false;
+      snprintf(b->bottom, sizeof(b->bottom), "%s", role ? role : "");
+    } else {
+      /* name and cost do not fit: the role tells units apart, the centre has none and keeps its name */
+      b->top = role ? role : name; b->enabled = true; b->poor = cost > g->money;
+      snprintf(b->bottom, sizeof(b->bottom), "%s $%ld", verb, (long)cost);
+    }
     out[n] = (Btn){BTN_CLOSE, "X", "", CLOSE_W, true, false}; n++;
   }
   return n;
