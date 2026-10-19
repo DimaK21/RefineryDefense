@@ -1,6 +1,8 @@
 #include "app.h"
 #include "gameover_window.h"
 #include "storage.h"
+#include "name_window.h"
+#include "submit_window.h"
 #include "ui.h"
 #include "ui_colors.h"
 #include "../logic/config.h"
@@ -52,15 +54,33 @@ static void prv_update(Layer *layer, GContext *ctx) {
   snprintf(rec, sizeof(rec), "%u nights \xC2\xB7 %lu", (unsigned)best.nights, (unsigned long)best.score);
   ui_stat_row(ctx, GRect(12, y, w - 24, 24), "Score", score, UI_ACCENT);
   ui_stat_row(ctx, GRect(12, y + 24, w - 24, 24), "Best", rec, UI_TEXT);
-  if (s_ready) ui_footer(ctx, b, "Tap to continue");
+  if (s_ready) ui_footer(ctx, b, s_record ? "Select: send \xC2\xB7 Tap: skip" : "Tap to continue");
 }
 
 static void prv_click(ClickRecognizerRef r, void *ctx) {
   if (s_ready) prv_go();
 }
 
+static void prv_send(void) {
+  const Game *g = app_game();
+  submit_window_push((Difficulty)g->difficulty, storage_best((Difficulty)g->difficulty));
+}
+
+static void prv_named(bool saved) {
+  if (saved) prv_send();
+}
+
+/* A new record: Select offers it to the online leaderboard (asking for a name the first time). */
+static void prv_select(ClickRecognizerRef r, void *ctx) {
+  if (!s_ready) return;
+  if (!s_record) { prv_go(); return; }
+  char name[NAME_LEN + 1];
+  if (storage_name(name)) prv_send();
+  else name_window_push(prv_named);
+}
+
 static void prv_clicks(void *ctx) {
-  window_single_click_subscribe(BUTTON_ID_SELECT, prv_click);
+  window_single_click_subscribe(BUTTON_ID_SELECT, prv_select);
   window_single_click_subscribe(BUTTON_ID_UP, prv_click);
   window_single_click_subscribe(BUTTON_ID_DOWN, prv_click);
   window_single_click_subscribe(BUTTON_ID_BACK, prv_click);
@@ -81,12 +101,18 @@ static void prv_load(Window *w) {
   s_ready = false;
   s_down = false;
   s_guard_timer = app_timer_register(INPUT_GUARD_MS, prv_guard_done, NULL);
+}
+
+/* Touch follows visibility: taps on the name screen above must not dismiss this one. */
+static void prv_appear(Window *w) {
+  s_down = false;
   touch_service_subscribe(prv_touch, NULL);
 }
 
+static void prv_disappear(Window *w) { touch_service_unsubscribe(); }
+
 static void prv_unload(Window *w) {
   if (s_guard_timer) { app_timer_cancel(s_guard_timer); s_guard_timer = NULL; }
-  touch_service_unsubscribe();
   layer_destroy(s_layer);
   s_layer = NULL;
 }
@@ -96,7 +122,8 @@ void gameover_window_push(void) {
     s_window = window_create();
     window_set_background_color(s_window, UI_BG);
     window_set_click_config_provider(s_window, prv_clicks);
-    window_set_window_handlers(s_window, (WindowHandlers){ .load = prv_load, .unload = prv_unload });
+    window_set_window_handlers(s_window, (WindowHandlers){
+      .load = prv_load, .appear = prv_appear, .disappear = prv_disappear, .unload = prv_unload });
   }
   window_stack_push(s_window, false);
 }

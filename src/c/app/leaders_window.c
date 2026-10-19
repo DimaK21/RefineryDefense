@@ -40,24 +40,6 @@ static bool prv_unsent(Best *out) {
 
 static int prv_visible(void) { return prv_unsent(NULL) ? LIST_ROWS - 1 : LIST_ROWS; }
 
-static void prv_draw_row(GContext *ctx, GRect b, int y, const BoardRow *r) {
-  bool me = s_my_rank && r->rank == s_my_rank;
-  if (me) {
-    graphics_context_set_fill_color(ctx, UI_ACCENT);
-    graphics_fill_rect(ctx, GRect(4, y + 1, b.size.w - 8, ROW_H), 3, GCornersAll);
-  }
-  GColor c = me ? GColorBlack : UI_TEXT;
-  const char *font = me ? FONT_KEY_GOTHIC_14_BOLD : FONT_KEY_GOTHIC_14;
-  char rank[8], nights[8], score[12];
-  snprintf(rank, sizeof(rank), "%lu", (unsigned long)r->rank);
-  snprintf(nights, sizeof(nights), "%u", (unsigned)r->nights);
-  snprintf(score, sizeof(score), "%lu", (unsigned long)r->score);
-  ui_text(ctx, rank, font, GRect(6, y - 1, 30, ROW_H + 2), GTextAlignmentRight, me ? c : UI_MUTED);
-  ui_text(ctx, r->name[0] ? r->name : "-", font, GRect(42, y - 1, 70, ROW_H + 2), GTextAlignmentLeft, c);
-  ui_text(ctx, nights, font, GRect(112, y - 1, 26, ROW_H + 2), GTextAlignmentRight, c);
-  ui_text(ctx, score, font, GRect(140, y - 1, b.size.w - 146, ROW_H + 2), GTextAlignmentRight, c);
-}
-
 static void prv_update(Layer *layer, GContext *ctx) {
   GRect b = layer_get_bounds(layer);
   int w = b.size.w;
@@ -71,10 +53,7 @@ static void prv_update(Layer *layer, GContext *ctx) {
     ui_text(ctx, msg, FONT_KEY_GOTHIC_18_BOLD, GRect(10, 90, w - 20, 48), GTextAlignmentCenter,
             s_state == ST_ERROR ? UI_BAD : UI_TEXT);
   } else {
-    ui_text(ctx, "#", FONT_KEY_GOTHIC_14_BOLD, GRect(6, LIST_TOP - 3, 30, 18), GTextAlignmentRight, UI_MUTED);
-    ui_text(ctx, "Name", FONT_KEY_GOTHIC_14_BOLD, GRect(42, LIST_TOP - 3, 70, 18), GTextAlignmentLeft, UI_MUTED);
-    ui_text(ctx, "Nts", FONT_KEY_GOTHIC_14_BOLD, GRect(108, LIST_TOP - 3, 30, 18), GTextAlignmentRight, UI_MUTED);
-    ui_text(ctx, "Score", FONT_KEY_GOTHIC_14_BOLD, GRect(140, LIST_TOP - 3, w - 146, 18), GTextAlignmentRight, UI_MUTED);
+    ui_board_header(ctx, GRect(4, LIST_TOP, w - 8, ROW_H));
     int vis = prv_visible();
     for (int i = 0; i < vis && s_scroll + i < s_n; i++) {
       int idx = s_scroll + i, y = LIST_TOP + ROW_H + i * ROW_H;
@@ -82,7 +61,8 @@ static void prv_update(Layer *layer, GContext *ctx) {
         graphics_context_set_stroke_color(ctx, UI_MUTED);
         for (int x = 8; x < w - 8; x += 4) graphics_draw_pixel(ctx, GPoint(x, y));
       }
-      prv_draw_row(ctx, b, y, &s_entries[idx]);
+      ui_board_row(ctx, GRect(4, y, w - 8, ROW_H), &s_entries[idx],
+                   s_my_rank && s_entries[idx].rank == s_my_rank);
     }
     if (s_scroll + vis < s_n) {   /* more below */
       graphics_context_set_fill_color(ctx, UI_MUTED);

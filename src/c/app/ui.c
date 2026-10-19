@@ -110,3 +110,29 @@ int ui_hit(const GRect *rects, int n, GPoint p) {
     if (grect_contains_point(&rects[i], &p)) return i;
   return -1;
 }
+
+void ui_board_row(GContext *ctx, GRect r, const BoardRow *row, bool me) {
+  if (me) {
+    graphics_context_set_fill_color(ctx, UI_ACCENT);
+    graphics_fill_rect(ctx, GRect(r.origin.x, r.origin.y + 1, r.size.w, r.size.h), 3, GCornersAll);
+  }
+  GColor c = me ? GColorBlack : UI_TEXT;
+  const char *font = me ? FONT_KEY_GOTHIC_14_BOLD : FONT_KEY_GOTHIC_14;
+  char rank[8], nights[8], score[12];
+  snprintf(rank, sizeof(rank), "%lu", (unsigned long)row->rank);
+  snprintf(nights, sizeof(nights), "%u", (unsigned)row->nights);
+  snprintf(score, sizeof(score), "%lu", (unsigned long)row->score);
+  int x = r.origin.x, y = r.origin.y - 1, w = r.size.w, h = r.size.h + 2;
+  ui_text(ctx, rank, font, GRect(x + 2, y, 30, h), GTextAlignmentRight, me ? c : UI_MUTED);
+  ui_text(ctx, row->name[0] ? row->name : "-", font, GRect(x + 38, y, 70, h), GTextAlignmentLeft, c);
+  ui_text(ctx, nights, font, GRect(x + 108, y, 26, h), GTextAlignmentRight, c);
+  ui_text(ctx, score, font, GRect(x + 136, y, w - 138, h), GTextAlignmentRight, c);
+}
+
+void ui_board_header(GContext *ctx, GRect r) {
+  int x = r.origin.x, y = r.origin.y - 3, w = r.size.w;
+  ui_text(ctx, "#", FONT_KEY_GOTHIC_14_BOLD, GRect(x + 2, y, 30, 18), GTextAlignmentRight, UI_MUTED);
+  ui_text(ctx, "Name", FONT_KEY_GOTHIC_14_BOLD, GRect(x + 38, y, 70, 18), GTextAlignmentLeft, UI_MUTED);
+  ui_text(ctx, "Nts", FONT_KEY_GOTHIC_14_BOLD, GRect(x + 104, y, 30, 18), GTextAlignmentRight, UI_MUTED);
+  ui_text(ctx, "Score", FONT_KEY_GOTHIC_14_BOLD, GRect(x + 136, y, w - 138, 18), GTextAlignmentRight, UI_MUTED);
+}

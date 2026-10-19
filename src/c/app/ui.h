@@ -1,5 +1,6 @@
 #pragma once
 #include <pebble.h>
+#include "../logic/board.h"
 
 /* Shared look of the menu, settings and summary screens. */
 #define UI_HEADER_H 44
@@ -18,5 +19,9 @@ void ui_toggle(GContext *ctx, GRect r, bool on);
 void ui_stat_row(GContext *ctx, GRect r, const char *label, const char *value, GColor value_color);
 /* Night sky with stars and a refinery silhouette standing on the bottom edge of `bounds`. */
 void ui_skyline(GContext *ctx, GRect bounds);
+/* One leaderboard line in r (16 px high): rank, name, nights, score; `me` fills it with the accent. */
+void ui_board_row(GContext *ctx, GRect r, const BoardRow *row, bool me);
+/* Column titles matching ui_board_row, in r. */
+void ui_board_header(GContext *ctx, GRect r);
 /* Index of the first rect that contains p, or -1. */
 int ui_hit(const GRect *rects, int n, GPoint p);
