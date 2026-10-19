@@ -19,7 +19,19 @@
       "watchface": false
     },
     "messageKeys": [
-      "dummy"
+      "REQ",
+      "SEQ",
+      "DIFF",
+      "NIGHTS",
+      "SCORE",
+      "NAME",
+      "STATUS",
+      "RANK",
+      "TOTAL",
+      "ROWS",
+      "ME",
+      "ON_NIGHTS",
+      "ON_SCORE"
     ],
     "resources": {
       "media": [
