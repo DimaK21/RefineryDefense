@@ -1,7 +1,8 @@
 {
   "name": "refinery_defense",
-  "author": "MakeAwesomeHappen",
+  "author": "Dmitry Kryushnikov",
   "version": "1.4.0",
+  "license": "MIT",
   "keywords": [
     "pebble-app"
   ],

@@ -1,125 +1,123 @@
-# Refinery Defense — механики и правила
+# Refinery Defense — mechanics and rules
 
-Справочник по тому, как игра работает **сейчас**, по коду. Если число здесь расходится с кодом,
-прав код: все константы баланса лежат в [config.h](../src/c/logic/config.h) и
-[config.c](../src/c/logic/config.c). Дизайн-спека с исходными идеями —
-[specs/2026-10-17-drone-defence-design.md](superpowers/specs/2026-10-17-drone-defence-design.md),
-её цифры частично устарели.
+A reference for how the game works **right now**, taken from the code. If a number here disagrees
+with the code, the code wins: every balance constant lives in
+[config.h](../src/c/logic/config.h) and [config.c](../src/c/logic/config.c).
 
-## Коротко
+## In short
 
-Tower defense для Pebble Time 2 (`emery`, 200×228, тач) и Pebble Round 2 (`gabbro`, круглый
-260×260, тач). Днём строишь ПВО вокруг
-нефтезавода, ночью смотришь налёт дронов и можешь один раз вызвать авиацию. Игра бесконечная,
-заканчивается, когда разрушены все объекты завода. Рекорд — число пережитых ночей, у каждого
-уровня сложности свой.
+Tower defense for Pebble Time 2 (`emery`, 200×228, touch) and Pebble Round 2 (`gabbro`, round
+260×260, touch). By day you build air defense around an oil refinery; by night you watch the drone
+raid and can call in support abilities. The game is endless and ends when every refinery object is
+destroyed. The record is the number of nights survived, kept separately per difficulty.
 
-Цикл: **День → Ночь → Итоги ночи → День следующей ночи …** → **Game Over**.
+Loop: **Day → Night → Night report → Day of the next night …** → **Game Over**.
 
-## Сложность
+## Difficulty
 
-Выбирается при New Game и сохраняется в партии. Цифры — в `DIFFICULTY_SPECS`
+Chosen on New Game and stored with the run. Numbers are in `DIFFICULTY_SPECS`
 ([config.c](../src/c/logic/config.c)).
 
-| Уровень | Стартовые деньги | Бюджет волны |
+| Level | Starting money | Wave budget |
 |---|---|---|
 | Easy | $600 | 70% |
 | Normal | $500 | 100% |
 | Hard | $500 | 160% |
 
-Остальные правила одинаковые. Рекорды (ночи и очки) хранятся отдельно для каждого уровня.
+All other rules are the same. Records (nights and score) are kept per level.
 
-## Карта
+## Map
 
-- Мир 200×228 единиц (= пиксели ночного экрана). Сетка 16×19 клеток по 12 единиц.
-- Днём масштаб ×2 со скроллом (клетка 24 px) и миникартой в правом нижнем углу. Ночью ×1,
-  вся карта на экране.
-- На Round 2 ночное поле стоит по центру круга в масштабе ×1, пустые углы поля срезаны кругом.
-  Днём башни и Play собраны внизу, камера упирается во внутренний прямоугольник, чтобы
-  крайние клетки поля можно было подвести в видимую часть круга.
-- Установка занимает 1 клетку, объект завода — 2×2. На объект ставить нельзя.
+- The world is 200×228 units (= pixels of the night screen). Grid of 16×19 cells, 12 units each.
+- By day the map is shown at ×2 with scrolling (24 px cells) and a minimap in the bottom-right
+  corner. By night it is ×1 and the whole map fits on screen.
+- On Round 2 the night field is centered in the circle at ×1; the empty corners are clipped by the
+  circle. By day the tower bar and Play button sit at the bottom, and the camera is clamped to an
+  inner rectangle so that edge cells can be brought into the visible part of the circle.
+- A defense unit takes 1 cell, a refinery object 2×2. Nothing can be placed on an object.
 
-## Завод
+## Refinery
 
-| Объект | Буква | Клетка (col,row) | Доход за ночь при 100% | Постройка | Роль, пока жив |
+| Object | Letter | Cell (col,row) | Income per night at 100% | Build cost | Role while alive |
 |---|---|---|---|---|---|
-| Distillation Column | D | 7,8 (центр) | 30 | 180 | — |
-| Tank Farm A | A | 3,12 | 20 | 120 | комбо (см. «Комбо») |
-| Tank Farm B | B | 11,4 | 20 | 120 | ракеты на 50% дешевле |
-| Loading Terminal | L | 11,13 | 25 | 150 | установки на 15% дешевле: покупка и ремонт |
-| Cracking Unit | C | 3,4 | 40 | 250 | способности на 30% дешевле и перезаряжаются на 30% быстрее |
+| Distillation Column | D | 7,8 (center) | 30 | 180 | — |
+| Tank Farm A | A | 3,12 | 20 | 120 | combo (see "Combo") |
+| Tank Farm B | B | 11,4 | 20 | 120 | missiles 50% cheaper |
+| Loading Terminal | L | 11,13 | 25 | 150 | units 15% cheaper: purchase and repair |
+| Cracking Unit | C | 3,4 | 40 | 250 | abilities 30% cheaper and recharge 30% faster |
 
-- У каждого объекта 100 HP. Состояния: не построен (пунктир с буквой), жив (рисунок объекта с
-  полоской HP), разрушен (серый с крестом).
-- **Роли.** Каждый объект, кроме центра, даёт свою роль, пока он жив (при любом HP). Разрушенный
-  или не построенный роли не даёт, Rebuild возвращает её. Роль проверяется в момент траты или
-  сбития: разрушение посреди ночи действует сразу, уже идущие перезарядки не пересчитываются.
-  Цена со скидкой округляется вниз, но не ниже $1. Константы — `OBJ_ROLE_*` и `ROLE_*_OFF_PCT` в
-  [config.h](../src/c/logic/config.h), подписи ролей — `ObjectSpec.role`.
-- Старт игры: построены Distillation Column и **случайный** из четырёх остальных объектов (из RNG
-  партии, seed ночей от этого не сдвигается), установок нет, деньги — по уровню сложности (на
-  Normal **$500**: хватает на радар, два Gepard, два Tor и ещё один Gepard). Старые сохранения с
-  Tank Farm A грузятся как есть.
-- Действия днём (тап по объекту):
-  - **Build** — построить: полная цена постройки.
-  - **Repair** — починить до 100 HP: `цена × недостающие HP / 100` (с округлением вниз).
-  - **Rebuild** — восстановить разрушенный: 150% цены постройки.
-- Больше живых объектов — больше дохода, но и больше налёт (см. «Волны»).
+- Each object has 100 HP. States: not built (dashed outline with a letter), alive (object drawing
+  with an HP bar), destroyed (gray with a cross).
+- **Roles.** Every object except the center grants its role while alive (at any HP). A destroyed or
+  unbuilt object grants nothing; Rebuild brings the role back. The role is checked at the moment of
+  spending or of a kill: destruction mid-night applies immediately, cooldowns already running are not
+  recalculated. Discounted prices round down, but never below $1. Constants are `OBJ_ROLE_*` and
+  `ROLE_*_OFF_PCT` in [config.h](../src/c/logic/config.h); role labels are `ObjectSpec.role`.
+- Game start: the Distillation Column and **one random** other object are built (drawn from the run
+  RNG; night seeds are not shifted by it), no units, money by difficulty (on Normal **$500**: enough
+  for a radar, two Gepards, two Tors and one more Gepard).
+- Day actions (tap an object):
+  - **Build** — full build cost.
+  - **Repair** — to 100 HP: `cost × missing HP / 100` (rounded down).
+  - **Rebuild** — restore a destroyed object: 150% of the build cost.
+- More living objects means more income, but also bigger raids (see "Waves").
 
-## Установки ПВО
+## Air defense units
 
-| Тип | Буква | Цена | Дальность | Перезарядка | Урон | Боезапас | HP | Ракета |
+| Type | Letter | Cost | Range | Reload | Damage | Ammo | HP | Missile |
 |---|---|---|---|---|---|---|---|---|
-| MG Nest | M | 30 | 22 | 0.25 с | 1 | ∞ | 3 | — |
-| Gepard | G | 70 | 34 | 0.5 с | 2 | ∞ | 5 | — |
-| Tor | T | 90 | 44 | 2 с | 6 | 6 | 3 | $5 |
-| Patriot | P | 250 | 80 | 4 с | 20 | 3 | 6 | $30 |
+| MG Nest | M | 30 | 22 | 0.25 s | 1 | ∞ | 3 | — |
+| Gepard | G | 70 | 34 | 0.5 s | 2 | ∞ | 5 | — |
+| Tor | T | 90 | 44 | 2 s | 6 | 6 | 3 | $5 |
+| Patriot | P | 250 | 80 | 4 s | 20 | 3 | 6 | $30 |
 | EW Jammer | E | 100 | 36 | — | — | — | 4 | — |
 | Radar | R | 80 | 70 | — | — | — | 3 | — |
 
-- **MG и Gepard** стреляют мгновенно (трассер), урон проходит сразу.
-- **Tor и Patriot** пускают самонаводящуюся ракету (скорость 60 ед/с, попадание в радиусе 4).
-  Ракета тратится в момент пуска. Одновременно в воздухе не больше 24 ракет; если слотов нет,
-  установка ждёт. Если цель погибла раньше, ракета исчезает.
-- **Боезапас не восстанавливается сам** — его докупают днём кнопкой **Reload**
-  (`недостающие ракеты × цена ракеты`; при живой Tank Farm B ракета вдвое дешевле: Tor $2,
-  Patriot $15). Пустой Tor/Patriot ночью молчит.
-- **Reload всем:** если хоть одному Tor/Patriot не хватает ракет, днём в левом нижнем углу карты
-  видна кнопка `Reload / $N` (N — полная сумма, красная, если денег меньше). Тап докупает ракеты
-  всем. Не хватает на всё — по одной ракете в установку с наименьшей долей боезапаса, пропуская
-  те, чья ракета уже не по карману. Не хватает ни на одну — короткая вибрация. Кнопка скрыта, пока
-  открыта панель действий, идёт перемещение или взведён старт ночи.
-- Цены установок в нижней панели и ремонт учитывают скидку Loading Terminal (MG $25, Gepard $59,
-  Tor $76, Patriot $212, Jammer $85, Radar $68). Sell всегда возвращает 50% базовой цены.
-- **EW Jammer** не стреляет. Дрон, чья траектория проходит в радиусе 36, летит на 40% медленнее,
-  а его виляние удваивается.
-- **Radar** не стреляет, но:
-  - установка, стоящая в зоне радара (центр клетки в радиусе 70), бьёт на **полную** дальность;
-    без радара — только на **60%** дальности;
-  - дроны в зоне радара всегда видны и **опознаны** (см. Gerbera).
-- Действия днём (тап по установке):
-  - **Move** — переставить на свободную клетку, бесплатно.
-  - **Sell** — второй тап «Sure?» подтверждает; возврат 50% цены (независимо от HP).
-  - **Repair** — до полного HP: `⌈цена × 30% × недостающие HP / макс. HP⌉`.
-  - **Reload** — только для Tor/Patriot.
-- Установка с 0 HP уничтожается и исчезает — восстановить нельзя, только купить заново.
-- Не больше 40 установок на карте.
+- **MG and Gepard** fire hitscan (tracer); damage applies instantly.
+- **Tor and Patriot** launch a homing missile (60 units/s, hits within radius 4). The missile is
+  spent on launch. At most 24 missiles can be in the air; if no slot is free, the unit waits. If the
+  target dies first, the missile vanishes.
+- **Ammo does not regenerate** — it is bought by day with **Reload**
+  (`missing missiles × missile price`; with a living Tank Farm B missiles cost half: Tor $2,
+  Patriot $15). An empty Tor/Patriot stays silent at night.
+- **Reload all:** if any Tor/Patriot is short on missiles, a `Reload / $N` button appears in the
+  bottom-left of the day map (N is the full sum, red if you can't afford it). Tapping it refills
+  everyone. If money runs short, it adds one missile at a time to the unit with the lowest ammo
+  share, skipping units whose missile is no longer affordable. If not even one is affordable — a
+  short vibration. The button is hidden while an action panel is open, a unit is being moved, or the
+  night start is armed.
+- Unit prices in the bottom bar and repairs include the Loading Terminal discount (MG $25,
+  Gepard $59, Tor $76, Patriot $212, Jammer $85, Radar $68). Sell always refunds 50% of the base
+  price.
+- **EW Jammer** doesn't shoot. A drone whose path passes within radius 36 flies 40% slower and its
+  weave doubles.
+- **Radar** doesn't shoot, but:
+  - a unit standing inside a radar's coverage (cell center within radius 70) fires at **full**
+    range; without radar — only **60%** of its range;
+  - drones inside radar coverage are always visible and **identified** (see Gerbera).
+- Day actions (tap a unit):
+  - **Move** — to a free cell, free of charge.
+  - **Sell** — a second tap on "Sure?" confirms; refunds 50% of the price (regardless of HP).
+  - **Repair** — to full HP: `⌈cost × 30% × missing HP / max HP⌉`.
+  - **Reload** — Tor/Patriot only.
+- A unit at 0 HP is destroyed and removed — it can't be restored, only bought again.
+- At most 40 units on the map.
 
-### Выбор цели установкой
+### Target selection
 
-Из дронов в своей текущей дальности установка бьёт того, кому осталось **меньше всего лететь** до
-его цели (самого опасного). Tor и Patriot пропускают опознанные Gerbera (не тратят ракеты на
-ложные цели); MG и Gepard стреляют по всем.
+Among drones within its current range, a unit shoots the one with the **least distance left** to its
+target (the most dangerous one). Tor and Patriot skip identified Gerberas (no missiles wasted on
+decoys); MG and Gepard shoot at everything.
 
-## Видимость ночью
+## Night visibility
 
-Дрон рисуется, только если он в зоне любого радара или горящего Flare, или в текущей дальности любой стреляющей
-установки (60% или 100%, см. выше). Jammer и радар своей дальностью стрельбы видимость не дают
-(радар — только своей зоной обзора). Остальное небо тёмное. Взрывы, трассеры и ракеты видны всегда.
+A drone is drawn only if it is inside any radar's coverage, a burning Flare, or the current range of
+any shooting unit (60% or 100%, see above). Jammers don't grant visibility, and a radar only through
+its coverage zone. The rest of the sky is dark. Explosions, tracers and missiles are always visible.
 
-## Дроны
+## Drones
 
-| Тип | Скорость | HP | Урон объекту | Урон установке | Награда | С ночи | Угроза |
+| Type | Speed | HP | Object damage | Unit damage | Reward | From night | Threat |
 |---|---|---|---|---|---|---|---|
 | Switchblade | 14 | 2 | 10 | 1 | $3 | 1 | 2 |
 | Shahed-136 | 8 | 6 | 35 | — | $8 | 2 | 4 |
@@ -127,207 +125,201 @@ Tower defense для Pebble Time 2 (`emery`, 200×228, тач) и Pebble Round 2
 | Harpy | 16 | 3 | 10 | 4 | $10 | 4 | 6 |
 | Shahed-238 | 22 | 26 | 35 | — | $15 | 6 | 7 |
 
-Скорость — единиц в секунду. «Угроза» — сколько очков бюджета волны стоит один дрон.
+Speed is in units per second. "Threat" is how many wave-budget points one drone costs.
 
-**Цели:**
-- **Switchblade** — с шансом 20% летит в ближайшую установку, иначе в случайный живой объект.
-  Прилетает стаями по 3–5 штук с интервалом 0.3 с.
-- **Shahed-136, Shahed-238** — случайный живой объект.
-- **Gerbera** — ложная цель: летит к объекту, но при прилёте ничего не повреждает. Вне радара
-  выглядит как Shahed-136, в зоне радара — серым кружком.
-- **Harpy** — ближайший радар; нет радаров — ближайшая установка; нет установок — объект.
-- Если цель исчезла по пути, дрон выбирает новую. Если атаковать нечего — дрон исчезает.
+**Targets:**
+- **Switchblade** — 20% chance to go for the nearest unit, otherwise a random living object.
+  Arrives in swarms of 3–5, 0.3 s apart.
+- **Shahed-136, Shahed-238** — a random living object.
+- **Gerbera** — a decoy: flies to an object but does no damage on arrival. Outside radar it looks
+  like a Shahed-136; inside radar it is a gray circle.
+- **Harpy** — the nearest radar; no radars — the nearest unit; no units — an object.
+- If the target disappears en route, the drone picks a new one. If there's nothing to attack, the
+  drone vanishes.
 
-**Полёт:** появляется в случайной точке края карты (сторона из активных сторон волны). Летит через
-две промежуточные точки на 1/3 и 2/3 пути, смещённые вбок до ±30 единиц, плюс синусоидальное
-виляние с амплитудой 3–8 единиц. Долетев до цели (ближе 4 единиц) — взрывается и наносит урон.
+**Flight:** spawns at a random point on the map edge (one of the wave's active sides). Flies through
+two waypoints at 1/3 and 2/3 of the way, offset sideways by up to ±30 units, plus a sinusoidal weave
+with amplitude 3–8 units. On reaching the target (within 4 units) it explodes and deals damage.
 
-## Волны
+## Waves
 
-- Бюджет угрозы ночи N: `(10 + 2·N²) × (1 + 0.1 × max(0, живые объекты − 2))`, округление вниз,
-  затем × процент сложности (Easy 70%, Normal 100%, Hard 160%), снова вниз.
-  Примеры на Normal при 2 объектах: ночь 1 → 12, 2 → 18, 3 → 28, 5 → 60, 10 → 210.
-- Типы доступны с ночи из таблицы и пока хватает бюджета. На больших бюджетах генератор
-  предпочитает тяжёлых дронов, чтобы влезть в лимит в 200 дронов на волну.
-- Стороны, откуда летят: ночи 1–2 — одна, 3–5 — две, 6+ — все четыре. Днём они видны заранее:
-  красные двойные стрелки у краёв карты и красная полоса на соответствующих краях миникарты
-  (`wave_sides` считает их тем же seed'ом, что и `wave_generate`).
-- Все дроны появляются в течение первых 40 с ночи. Одновременно в небе не больше 64 дронов;
-  лишние ждут свободного места.
-- Волна детерминирована seed'ом ночи: перезапуск той же ночи даёт тот же налёт.
+- Threat budget of night N: `(10 + 2·N²) × (1 + 0.1 × max(0, living objects − 2))`, rounded down,
+  then × the difficulty percentage (Easy 70%, Normal 100%, Hard 160%), rounded down again.
+  Examples on Normal with 2 objects: night 1 → 12, 2 → 18, 3 → 28, 5 → 60, 10 → 210.
+- Types are available from the night in the table and while the budget allows. With large budgets
+  the generator prefers heavy drones to stay within the 200-drones-per-wave limit.
+- Attack sides: nights 1–2 — one, 3–5 — two, 6+ — all four. They are shown in advance during the
+  day: red double arrows at the map edges and a red strip on the matching minimap edges
+  (`wave_sides` uses the same seed as `wave_generate`).
+- All drones spawn within the first 40 s of the night. At most 64 drones can be in the sky at once;
+  the rest wait for a free slot.
+- A wave is determined by the night seed: replaying the same night gives the same raid.
 
-## Ночь
+## Night
 
-- Симуляция шагами по 40 мс. **Select** — ускорение ×2. **Back** — пауза; на паузе **Back** —
-  выход в меню, **Select** — продолжить. **Up/Down** — выбрать способность. Потеря фокуса
-  (уведомление) ставит на паузу.
-- Ночь кончается, когда все дроны волны выпущены и в небе пусто.
-- **Game Over** — в момент, когда не осталось ни одного живого объекта.
+- The simulation runs in 40 ms steps. **Select** — ×2 speed. **Back** — pause; while paused,
+  **Back** exits to the menu, **Select** resumes. **Up/Down** — choose an ability. Losing focus (a
+  notification) pauses the game.
+- The night ends when every drone of the wave has spawned and the sky is empty.
+- **Game Over** happens the moment no living object remains.
 
-### Визуальная обратная связь
+### Visual feedback
 
-Игра рассчитана на игру без звука, поэтому всё важное видно на экране:
+The game is designed to be played without sound, so everything important is visible on screen:
 
-- Сбитый дрон — взрыв в 4 фазы (вспышка, огненный шар, горящее кольцо, гаснущее кольцо) с
-  разлётом обломков, 0.4 с, и всплывающая жёлтая надпись `+$N` с наградой, 0.7 с.
-- Дрон долетел до объекта или установки — крупный взрыв с обломками во все стороны, 0.6 с.
-- Начало ночи — баннер «NIGHT N / Drones incoming» с подсказкой «Up/Down: ability · Tap map: aim»
-  и стрелки сторон налёта, первые 2.5 с.
-- Дрон пересёк край карты — красный мигающий блип с расходящимся кольцом у края, 1.2 с, даже
-  если сам дрон ещё не виден.
-- Силуэты дронов: Switchblade — маленький крестик, Shahed-136 — красная дельта по курсу,
-  Shahed-238 — дельта крупнее с жёлтым выхлопом, Harpy — длинный розовый дротик, опознанная
-  Gerbera — серое кольцо (неопознанная выглядит как Shahed-136).
-- MG и Gepard дают белую вспышку у ствола вместе с трассером; у ракет Tor/Patriot серый шлейф.
-- Объект с HP ≤ 66 горит (одно пламя и дым), с HP ≤ 33 — два пламени. Разрушенный объект
-  дымится. Ночью пламя мерцает, днём кадр статичный.
+- A downed drone — a 4-phase explosion (flash, fireball, burning ring, fading ring) with flying
+  debris, 0.4 s, and a floating yellow `+$N` reward label, 0.7 s.
+- A drone reaching an object or unit — a large explosion with debris in all directions, 0.6 s.
+- Night start — a "NIGHT N / Drones incoming" banner with the hint "Up/Down: ability · Tap map: aim"
+  and attack-side arrows for the first 2.5 s.
+- A drone crossing the map edge — a blinking red blip with an expanding ring at the edge, 1.2 s,
+  even if the drone itself isn't visible yet.
+- Drone silhouettes: Switchblade — a small cross, Shahed-136 — a red delta along its heading,
+  Shahed-238 — a larger delta with a yellow exhaust, Harpy — a long pink dart, identified Gerbera —
+  a gray ring (unidentified looks like a Shahed-136).
+- MG and Gepard show a white muzzle flash along with the tracer; Tor/Patriot missiles leave a gray
+  trail.
+- An object at HP ≤ 66 burns (one flame and smoke), at HP ≤ 33 — two flames. A destroyed object
+  smokes. At night the flames flicker; by day the frame is static.
 
-### Способности
+### Abilities
 
-Цифры — в `ABILITY_SPECS` ([config.c](../src/c/logic/config.c)).
+Numbers are in `ABILITY_SPECS` ([config.c](../src/c/logic/config.c)).
 
-| Способность | Цена | Перезарядка | Радиус | Действие |
+| Ability | Cost | Cooldown | Radius | Effect |
 |---|---|---|---|---|
-| Air Strike | $60 | 25 с | 25 | сразу уничтожает всех дронов в круге (с наградой) |
-| EW Pulse | $25 | 12 с | 40 | 5 с дроны, чья траектория в круге, летят на 60% медленнее |
-| Flare | $15 | 8 с | 45 | 6 с зона работает как радар: дроны видны и опознаны, башни в ней бьют на полную дальность |
+| Air Strike | $60 | 25 s | 25 | instantly destroys every drone in the circle (with rewards) |
+| EW Pulse | $25 | 12 s | 40 | for 5 s, drones whose path is in the circle fly 60% slower |
+| Flare | $15 | 8 s | 45 | for 6 s the zone works as radar: drones are visible and identified, towers inside fire at full range |
 
-- При живом Cracking Unit цена и перезарядка на 30% меньше: Air Strike $42 / 17.5 с,
-  EW Pulse $17 / 8.4 с, Flare $10 / 5.6 с.
-- В начале ночи все готовы; после применения способность уходит на перезарядку. Все три
-  срабатывают в момент подтверждения; зоны EW и Flare конец ночи не держат. Air Strike раньше падал
-  через 1.5 с — по движущимся дронам приходилось целиться с упреждением, задержку убрали.
-- EW Pulse и Jammer не складываются: действует сильнейшее замедление (60%). Виляние удваивает
-  только Jammer.
-- **Up/Down** выбирают способность. Тап по карте ставит метку (круг её радиуса); тап рядом с
-  меткой (до 20 px) применяет. Метка серая, если способность на перезарядке или не хватает
-  денег — тогда подтверждение даёт короткую вибрацию и ничего не тратит. Метка пропадает через
-  3 с после последней установки.
-- Под меткой (у нижнего края — над ней) подпись: `Tap again: Air Strike $60`, либо `Wait 12s`
-  (перезарядка), либо `Need $60` (денег). Цена — уже со скидкой Cracking Unit.
-- После Up/Down по центру экрана 2 с (реальное время, игра не останавливается) карточка: крупная
-  иконка, название, что делает, цена и перезарядка. Новое Up/Down её заменяет, тап по карте прячет
-  (и сразу ставит метку), на паузе не видна.
-- HUD: название выбранной способности `AIR` / `EW` / `FLARE`, жёлтое — можно применить, серое —
-  нельзя; на перезарядке рядом оставшиеся секунды (`EW 7`).
-- На карте: Air Strike — расширяющееся кольцо взрыва; EW Pulse — фиолетовое двойное кольцо; Flare —
-  бледно-жёлтое кольцо со звездой. Последнюю секунду зоны мигают.
-- Награды за сбитых начисляются сразу, их можно потратить на способности в ту же ночь.
+- With a living Cracking Unit, cost and cooldown are 30% lower: Air Strike $42 / 17.5 s,
+  EW Pulse $17 / 8.4 s, Flare $10 / 5.6 s.
+- All abilities are ready at the start of the night; after use an ability goes on cooldown. All
+  three take effect on confirmation; EW and Flare zones don't carry over past the end of the night.
+- EW Pulse and Jammer don't stack: the strongest slowdown (60%) applies. Only the Jammer doubles the
+  weave.
+- **Up/Down** choose an ability. A tap on the map places a marker (a circle of its radius); a tap
+  near the marker (within 20 px) fires it. The marker is gray if the ability is on cooldown or
+  unaffordable — then confirming gives a short vibration and spends nothing. The marker disappears
+  3 s after it was last placed.
+- Under the marker (above it near the bottom edge) is a label: `Tap again: Air Strike $60`, or
+  `Wait 12s` (cooldown), or `Need $60` (money). The price already includes the Cracking Unit
+  discount.
+- After Up/Down a card appears in the center of the screen for 2 s (real time, the game keeps
+  running): a large icon, the name, what it does, cost and cooldown. Another Up/Down replaces it, a
+  tap on the map hides it (and places a marker right away); it is hidden while paused.
+- HUD: the selected ability name `AIR` / `EW` / `FLARE`, yellow if usable, gray if not; on cooldown
+  the remaining seconds are shown next to it (`EW 7`).
+- On the map: Air Strike — an expanding blast ring; EW Pulse — a purple double ring; Flare — a pale
+  yellow ring with a star. Zones blink during their last second.
+- Kill rewards are credited immediately and can be spent on abilities the same night.
 
-### Комбо
+### Combo
 
-- Комбо — роль **Tank Farm A**: без живой Tank Farm A серия не считается, множитель всегда ×1,
-  надписи COMBO нет, «Best combo» в итогах — 0. Если её разрушат посреди серии, следующее сбитие
-  уже без множителя.
-- Сбитие в пределах 2 с после предыдущего продолжает серию, иначе серия начинается заново.
-  Сбития авиаударом тоже считаются.
-- Награда (деньги и очки) умножается: серия 1–2 → ×1, 3–5 → ×1.5, 6+ → ×2, округление вниз.
-  `+$N` над дроном показывает уже умноженную сумму.
-- При серии ≥ 3 под HUD горит `COMBO N  x1.5` (жёлтым) или `x2` (оранжевым).
+- Combo is the role of **Tank Farm A**: without a living Tank Farm A no streak is counted, the
+  multiplier is always ×1, there's no COMBO label, and "Best combo" in the report is 0. If it is
+  destroyed mid-streak, the next kill has no multiplier.
+- A kill within 2 s of the previous one continues the streak; otherwise the streak restarts. Air
+  Strike kills count too.
+- The reward (money and score) is multiplied: streak 1–2 → ×1, 3–5 → ×1.5, 6+ → ×2, rounded down.
+  The `+$N` above the drone shows the multiplied amount.
+- With a streak ≥ 3, `COMBO N  x1.5` (yellow) or `x2` (orange) is shown below the HUD.
 
-## Итоги ночи и деньги
+## Night report and money
 
-- Утром начисляется доход: `Σ доход объекта × его HP / 100` по живым объектам.
-- Очки: награда за каждого сбитого (с множителем комбо) + 100 за каждую пережитую ночь.
-- Экран итогов: сбито, награды, доход, попаданий по объектам, потеряно установок, лучшая серия.
-- Рекорд: больше ночей, при равенстве — больше очков. Свой для каждой сложности; экран Game Over
-  показывает уровень в шапке и рекорд этого уровня.
+- In the morning income is paid: `Σ object income × its HP / 100` over living objects.
+- Score: the reward for every kill (with the combo multiplier) + 100 for each night survived.
+- The report screen: kills, rewards, income, hits on objects, units lost, best streak.
+- Record: more nights wins; on a tie, the higher score. Kept per difficulty; the Game Over screen
+  shows the level in its header and that level's record.
 
-## Онлайн-лидерборд
+## Online leaderboard
 
-- Три таблицы в LootLocker, по одной на сложность; порядок тот же, что у рекорда (ночи, затем
-  очки). В таблицу уходит одно число `ночи × 1 000 000 + min(очки, 999 999)`; на сервере хранится
-  лучший результат игрока.
-- Имя — до 6 символов `A–Z`, `0–9`, пробел; задаётся в Settings → Name или при первой отправке.
-  Up/Down — символ (удержание — быстро), Select — дальше, удержание Select — сохранить, Back —
-  назад/отмена.
-- Game Over с новым рекордом: футер `Select: send · Tap: skip`. Отправка показывает место
-  `#N of M` и до двух строк выше и ниже. Если на сервере уже лучше — строка `Your best online`.
-- Меню → Leaders: топ-10 и своя строка (под пунктиром, если не в топе). Select/тап — следующая
-  сложность, Up/Down — прокрутка. Если локальный рекорд лучше отправленного — строка
-  `Unsent best` и удержание Select отправляет его.
-- В сеть игра ходит только по этим действиям. Ошибки: `No phone connection`, `No internet`,
-  `Server error`; игра без связи работает как раньше. Настройка сервиса —
+- Three LootLocker leaderboards, one per difficulty; ordering is the same as for the record (nights,
+  then score). A single number is submitted: `nights × 1,000,000 + min(score, 999,999)`; the server
+  keeps the player's best result.
+- Name — up to 6 characters `A–Z`, `0–9`, space; set in Settings → Name or on the first submission.
+  Up/Down — character (hold — fast), Select — next, hold Select — save, Back — back/cancel.
+- Game Over with a new record: footer `Select: send · Tap: skip`. Submitting shows the rank
+  `#N of M` and up to two rows above and below. If the server already has a better result — a
+  `Your best online` row.
+- Menu → Leaders: top 10 and your own row (below a dashed line if you're not in the top). Select/tap
+  — next difficulty, Up/Down — scroll. If your local record is better than the submitted one — an
+  `Unsent best` row, and holding Select submits it.
+- The game only goes online for these actions. Errors: `No phone connection`, `No internet`,
+  `Server error`; without a connection the game works as usual. Service setup —
   [LEADERBOARD_SETUP.md](LEADERBOARD_SETUP.md).
 
-## День: управление
+## Day controls
 
-- Свайп — скролл карты.
-- Нижняя панель: 6 типов установок с ценой (красная — не хватает денег) и кнопка ▶.
-  **Up/Down** — сменить выбранный тип.
-- Тап по пустой клетке показывает «призрак» установки с её дальностью; второй тап по той же
-  клетке покупает. Не хватает денег — короткая вибрация.
-- Тап по установке или объекту открывает панель действий. Тап мимо панели закрывает её.
-- **▶ или Select** — первый раз взводит старт ночи («Tap again to start night»), второй в течение
-  2 с — начинает ночь. Любой другой тап отменяет.
-- **Back** — сохранить и выйти в меню.
+- Swipe — scroll the map.
+- Bottom bar: 6 unit types with prices (red — not enough money) and a ▶ button.
+  **Up/Down** — change the selected type.
+- A tap on an empty cell shows a "ghost" of the unit with its range; a second tap on the same cell
+  buys it. Not enough money — a short vibration.
+- A tap on a unit or object opens its action panel. A tap outside the panel closes it.
+- **▶ or Select** — the first press arms the night start ("Tap again to start night"), a second
+  within 2 s starts the night. Any other tap cancels.
+- **Back** — save and exit to the menu.
 
-## Сохранение
+## Saving
 
-- Сохраняется в одном persist-ключе: номер ночи, деньги, очки, seed, объекты, установки, сложность.
-  Формат версии 2; сохранение версии 1 (без сложности) загружается как Normal.
-- Номера всех persist-ключей (сохранение, рекорды, настройки) — в одном месте,
-  [persist_keys.h](../src/c/app/persist_keys.h); тест проверяет, что они не совпадают. До 1.3.0
-  настройка звука делила ключ с рекордами и включалась от их первого байта.
-- Рекорды — отдельный ключ, массив по сложностям. Старый единый рекорд при первом чтении
-  считается рекордом Normal.
-- Моменты сохранения: новая игра, выход из дня, старт ночи, итоги ночи.
-- Выход посреди ночи — **Continue** начнёт эту ночь заново с тем же налётом.
-- Game Over стирает сохранение. Битое сохранение стирается при попытке Continue.
+- The run is stored in one persist key: night number, money, score, seed, objects, units,
+  difficulty. Format version 2; a version 1 save (without difficulty) loads as Normal.
+- All persist key numbers (save, records, settings) are defined in one place,
+  [persist_keys.h](../src/c/app/persist_keys.h); a test checks that they don't collide.
+- Records are a separate key, an array per difficulty. The old single record is treated as the
+  Normal record on first read.
+- Save points: new game, leaving the day, night start, night report.
+- Quitting mid-night — **Continue** restarts that night with the same raid.
+- Game Over erases the save. A corrupted save is erased when Continue is attempted.
 
-## Настройки
+## Settings
 
-Экран **Settings** в главном меню. Хранятся отдельно от партии и переживают Game Over.
+The **Settings** screen in the main menu. Stored separately from the run and survives Game Over.
 
-| Настройка | По умолчанию | Что делает |
+| Setting | Default | What it does |
 |---|---|---|
-| Sound | выкл | Звуки выстрелов ракет и взрывов через динамик. Без звука и при системном mute — тишина. |
-| Vibration | вкл | Короткая — попадание по объекту и «не хватает денег»; длинная — объект разрушен. |
+| Sound | off | Missile launch and explosion tones through the speaker. Off or system mute — silence. |
+| Vibration | on | Short — a hit on an object and "not enough money"; long — an object destroyed. |
 
-Там же пункт **How to play** — 9 коротких страниц с правилами для игрока (цель, день, ночь,
-способности, установки, дроны, деньги, роли объектов). Тап по правым 2/3 экрана или Down/Select — следующая страница, по
-левой трети или Up — предыдущая; после последней страницы экран закрывается. Тексты — в
-[help_window.c](../src/c/app/help_window.c): меняешь механику — поправь и их.
+Also there: **How to play** — 9 short pages of rules for the player (goal, day, night, abilities,
+units, drones, money, object roles). A tap on the right 2/3 of the screen or Down/Select — next page;
+on the left third or Up — previous; after the last page the screen closes. The texts live in
+[help_window.c](../src/c/app/help_window.c): if you change a mechanic, update them too.
 
-## Экраны
+## Screens
 
-Меню (Continue · уровень / New Game / Settings, внизу ночи-рекорды `E · N · H`). New Game
-открывает выбор сложности Easy / Normal / Hard (внизу — рекорд выделенного уровня, Back — назад)
-→ День → Ночь → Итоги → День … → Game Over →
-Меню. Если есть сохранение, New Game сначала спрашивает «Overwrite save?» — второй тап в течение
-2.5 с начинает новую игру и стирает старую партию.
+Menu (Continue · level / New Game / Leaders / Settings, night records `E · N · H` at the bottom).
+New Game opens difficulty selection Easy / Normal / Hard (the selected level's record at the bottom,
+Back — back) → Day → Night → Report → Day … → Game Over → Menu. If a save exists, New Game first
+asks "Overwrite save?" — a second tap within 2.5 s starts a new game and erases the old run.
 
-В HUD деньги жёлтые, здоровье завода — зелёное (> 66%), янтарное (> 33%) или красное. Экраны итогов и Game Over первые 0.6 с игнорируют ввод, чтобы случайный тап из ночи их не
-пролистнул. Если тач в системе выключен — экран с просьбой включить его.
+In the HUD money is yellow and refinery health is green (> 66%), amber (> 33%) or red. The report
+and Game Over screens ignore input for the first 0.6 s so that a stray tap from the night doesn't
+skip them. If touch is disabled in the system, a screen asks to enable it.
 
-## Проверка баланса
+## Balance check
 
-[test_balance.c](../tests/test_balance.c) играет 60 сидов ботом (стартует со случайным вторым
-объектом, как игрок; утром чинит объекты ниже 60 HP, докупает ракеты кнопкой «Reload всем» и радар, ставит Gepard/Tor кольцом вокруг живых объектов; ночью каждые 0.4 с бросает
-Air Strike и EW Pulse в скопление от 3 видимых дронов) и столько же — «пустым» игроком без установок.
-Исход бота двугорбый: сид либо проигрывает к ночам 4–8, либо дорастает до стены на ночах 16–21, где
-кончаются клетки у объектов. Поэтому проверяются устойчивые величины, а не медиана:
+[test_balance.c](../tests/test_balance.c) plays 60 seeds with a bot (it starts with a random second
+object like a player; each morning it repairs objects below 60 HP, refills missiles with "Reload
+all", buys a radar and places Gepards/Tors in a ring around living objects; at night every 0.4 s it
+drops Air Strike and EW Pulse on clusters of 3+ visible drones) and as many with an "empty" player
+who builds nothing. The bot's outcome is bimodal: a seed either loses by nights 4–8 or grows into a
+wall at nights 16–21, where cells near the objects run out. So the test checks stable quantities
+rather than the median:
 
-- среднее число ночей 11–20;
-- нижний квартиль ≥ 6 (три четверти сидов переживают ночь 6, когда приходят Shahed-238 с четырёх
-  сторон);
-- не больше 5% сидов проиграно на ночи 5 или раньше;
-- ни один сид не доходит до 60 ночей, а пустой игрок проигрывает на ночах 1–3;
-- при каждом из четырёх стартовых объектов среднее не дальше 3 ночей от общего.
+- mean nights 11–20;
+- lower quartile ≥ 6 (three quarters of seeds survive night 6, when Shahed-238s arrive from four
+  sides);
+- at most 5% of seeds lost on night 5 or earlier;
+- no seed reaches 60 nights, and the empty player loses on nights 1–3;
+- for each of the four starting objects the mean is within 3 nights of the overall mean.
 
-На 1000 сидах при $500: среднее 15.6, квартиль 14, медиана 18, 1.2% проиграно к ночи 5. При старых
-$400 было 8.3 / 5 / 6 / 12.8%: стартовый набор съедал все деньги, одна ранняя утечка уходила в
-ремонт и ракеты, оборона переставала расти, Harpy сносили радар, и ночь 6 добивала.
+For Easy and Hard the same bot checks only the ordering: the Easy mean is at least 3 nights above
+Normal, Hard at least 3 below; on Easy at most 5% of seeds are lost by night 5, on Hard at most 10%;
+the empty player loses by night 5 on Easy and by night 3 on Hard.
 
-С ролями объектов и случайным стартом, 60 сидов: среднее 16.3, квартиль 12, медиана 18, 2 из 60
-проиграно к ночи 5. По стартовому объекту: Tank Farm A 16.3, Tank Farm B 16.0, Loading Terminal
-17.0, Cracking Unit 17.7 — старт честный, подкрутка цифр не понадобилась. С мгновенным Air Strike:
-среднее 17.1, квартиль 17, медиана 19, 2 из 60 к ночи 5; по старту 16.4–18.3.
-
-Для Easy и Hard тот же бот проверяет только порядок: средняя Easy минимум на 3 ночи выше Normal,
-Hard — на 3 ниже; на Easy не больше 5% сидов проиграно к ночи 5, на Hard — не больше 10%; пустой
-игрок проигрывает на Easy к ночи 5, на Hard — к ночи 3. На 60 сидах с ролями и мгновенным Air
-Strike: Easy — среднее 23.4, квартиль 22; Hard — среднее 10.1, квартиль 7, медиана 9, 1 из 60
-проиграно к ночи 5 (до ролей Easy 22.5, Hard 10.5). Hard с
-$450 и волнами 140% проигрывал к ночи 5 каждый пятый сид — ранние деньги решают больше, чем
-размер налёта.
+Reference numbers on 60 seeds: Normal — mean 17.1, quartile 17, median 19, 2 of 60 lost by night 5,
+16.4–18.3 depending on the starting object; Easy — mean 23.4, quartile 22; Hard — mean 10.1,
+quartile 7, median 9, 1 of 60 lost by night 5.
