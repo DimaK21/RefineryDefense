@@ -3,5 +3,5 @@
 module.exports = {
   gameKey: '',
   domain: 'https://xxxx.api.lootlocker.com',
-  gameVersion: '1.4.0'
+  gameVersion: '1.4.1'
 };

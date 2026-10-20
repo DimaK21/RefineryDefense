@@ -87,9 +87,10 @@ store/         app store banner, icons and screenshots
 
 ## Versioning
 
-The version lives in one place: `version` in [package.json](package.json), formatted
-`MAJOR.MINOR.0`. It is shown at the bottom of the Settings screen. New features bump `MINOR`;
-breaking save changes or a major redesign bump `MAJOR`. Releases are tagged `v<MAJOR>.<MINOR>`.
+The version lives in `version` in [package.json](package.json), formatted `MAJOR.MINOR.PATCH`.
+It is shown at the bottom of the Settings screen and in the bundle name. Fixes bump `PATCH`, new
+features bump `MINOR`, breaking save changes or a major redesign bump `MAJOR`. Releases are tagged
+`v<version>`, e.g. `v1.4.1`. Keep `gameVersion` in `src/pkjs/lootlocker_config.js` in step.
 
 ## License
 
