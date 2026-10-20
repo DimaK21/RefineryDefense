@@ -33,8 +33,6 @@ function createClient(opts) {
       function (err, status, json) {
         if (err) return cb(1);
         if (status < 200 || status >= 300 || !json || !json.session_token) return cb(2);
-        // The sent name belongs to the player it was sent for; another player has none yet.
-        if (store.getItem('ll_player_id') !== String(json.player_id)) store.setItem('ll_name', '');
         store.setItem('ll_session', json.session_token);
         store.setItem('ll_player_id', String(json.player_id));
         cb(0);
@@ -80,15 +78,17 @@ function createClient(opts) {
     }
   }
 
-  // Renames only when the name differs from the last one the server accepted.
-  // A refused name (e.g. taken) does not block the request it rides along with.
+  // Renames only when this player has not had this name accepted yet ("<player id>|<name>":
+  // a relogin can land on another player). A refused name does not block the request it rides
+  // along with. Before 1.4.3 the key was ll_name, without the player: it is ignored on purpose.
+  function sentName(name) { return store.getItem('ll_player_id') + '|' + name; }
   function syncName(name, cb) {
-    if (!name || store.getItem('ll_name') === name) return cb(0);
+    if (!name || store.getItem('ll_sent_name') === sentName(name)) return cb(0);
     renaming = true;
     call('PATCH', '/player/name', { name: name }, function (s) {
       renaming = false;
       if (s === 1) return cb(1);
-      if (s === 0) store.setItem('ll_name', name);
+      if (s === 0) store.setItem('ll_sent_name', sentName(name));
       cb(0);
     });
   }
