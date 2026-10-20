@@ -139,6 +139,56 @@ test('expired session answered with 403: one relogin and retry', function () {
   assert.strictEqual(http.log.filter(function (c) { return c.path === '/v2/session/guest'; }).length, 1);
 });
 
+test('relogin as another player sends the name again', function () {
+  var lists = 0;
+  var http = fakeHttp(baseRoutes({
+    'POST /v2/session/guest': function () { return [200, { session_token: 'tok2', player_id: 888 }]; },
+    'GET /leaderboards/normal/list': function () {
+      lists++;
+      return lists === 1 ? [403, { message: 'invalid session token' }] : [200, { items: [], pagination: { total: 0 } }];
+    }
+  }));
+  var store = memStore({ ll_session: 'old', ll_player_id: '777', ll_name: 'DIM' });
+  var r = sync(function (cb) { client(http, store).table(1, 'DIM', cb); });
+  assert.strictEqual(r.status, 0);
+  var renames = http.log.filter(function (c) { return c.path === '/player/name'; });
+  assert.strictEqual(renames.length, 1);
+  assert.strictEqual(renames[0].body.name, 'DIM');
+});
+
+test('submit retried after relogin as another player: renamed first, sent as the new player', function () {
+  var subs = 0;
+  var http = fakeHttp(baseRoutes({
+    'POST /v2/session/guest': function () { return [200, { session_token: 'tok2', player_id: 888 }]; },
+    'POST /leaderboards/normal/submit': function () {
+      subs++;
+      return subs === 1 ? [403, { message: 'invalid session token' }] : [200, {}];
+    },
+    'GET /leaderboards/normal/member/888': function () { return [200, { rank: 1, score: 12003400, member_id: '888' }]; },
+    'GET /leaderboards/normal/list': function () { return [200, { items: [item(1, 'DIM', 12, 3400, 888)], pagination: { total: 1 } }]; }
+  }));
+  var store = memStore({ ll_session: 'old', ll_player_id: '777', ll_name: 'DIM' });
+  var r = sync(function (cb) { client(http, store).submit(1, 12, 3400, 'DIM', cb); });
+  assert.strictEqual(r.status, 0);
+  var paths = http.log.map(function (c) { return c.method + ' ' + c.path; });
+  var rename = paths.indexOf('PATCH /player/name'), retry = paths.lastIndexOf('POST /leaderboards/normal/submit');
+  assert.ok(rename >= 0 && rename < retry, 'renamed before the retried submit: ' + paths.join(', '));
+  assert.strictEqual(http.log[retry].body.member_id, '888');
+  assert.strictEqual(store.data.ll_name, 'DIM');
+});
+
+test('403 on everything after relogin: server error, no rename loop', function () {
+  var http = fakeHttp(baseRoutes({
+    'POST /v2/session/guest': function () { return [200, { session_token: 'tok2', player_id: 888 }]; },
+    'PATCH /player/name': function () { return [403, {}]; },
+    'GET /leaderboards/normal/list': function () { return [403, {}]; }
+  }));
+  var store = memStore({ ll_session: 'old', ll_player_id: '777', ll_name: 'DIM' });
+  var r = sync(function (cb) { client(http, store).table(1, 'DIM', cb); });
+  assert.strictEqual(r.status, 2);
+  assert.ok(http.log.length < 10, http.log.length + ' requests');
+});
+
 test('401 twice is a server error, no login loop', function () {
   var http = fakeHttp(baseRoutes({ 'GET /leaderboards/normal/list': function () { return [401, {}]; } }));
   var r = sync(function (cb) { client(http).table(1, 'DIM', cb); });

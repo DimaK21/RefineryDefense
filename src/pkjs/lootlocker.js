@@ -33,25 +33,40 @@ function createClient(opts) {
       function (err, status, json) {
         if (err) return cb(1);
         if (status < 200 || status >= 300 || !json || !json.session_token) return cb(2);
+        // The sent name belongs to the player it was sent for; another player has none yet.
+        if (store.getItem('ll_player_id') !== String(json.player_id)) store.setItem('ll_name', '');
         store.setItem('ll_session', json.session_token);
         store.setItem('ll_player_id', String(json.player_id));
         cb(0);
       });
   }
 
+  var wantName = '';    // the player's name for the request in flight
+  var renaming = false;
+
+  // Logs in, then renames if the login landed on a player without this name, so a request
+  // retried after a relogin never goes out under a nameless player.
+  function relogin(cb) {
+    login(function (s) {
+      if (s || renaming) return cb(s);
+      syncName(wantName, cb);
+    });
+  }
+
   // One authenticated request; a 401 or 403 logs in again and retries once. cb(status, json)
   // LootLocker answers an expired session with 403 "invalid session token", not 401.
+  // `body` may be a function, read on every attempt (a relogin can change the player id).
   // `empty` lists HTTP codes that count as success with no body.
   function call(method, path, body, cb, empty) {
     var relogged = false;
     function attempt() {
       var headers = { 'Content-Type': 'application/json', 'LL-Version': '2021-03-01',
                       'x-session-token': store.getItem('ll_session') || '' };
-      http(method, base + path, headers, body, function (err, status, json) {
+      http(method, base + path, headers, typeof body === 'function' ? body() : body, function (err, status, json) {
         if (err) return cb(1);
         if ((status === 401 || status === 403) && !relogged) {
           relogged = true;
-          return login(function (s) { return s ? cb(s) : attempt(); });
+          return relogin(function (s) { return s ? cb(s) : attempt(); });
         }
         if (empty && empty.indexOf(status) >= 0) return cb(0, {});
         if (status < 200 || status >= 300) return cb(2);
@@ -61,7 +76,7 @@ function createClient(opts) {
     if (store.getItem('ll_session')) attempt();
     else {
       relogged = true;   // a fresh session that still gets 401 will not get better
-      login(function (s) { return s ? cb(s) : attempt(); });
+      relogin(function (s) { return s ? cb(s) : attempt(); });
     }
   }
 
@@ -69,7 +84,9 @@ function createClient(opts) {
   // A refused name (e.g. taken) does not block the request it rides along with.
   function syncName(name, cb) {
     if (!name || store.getItem('ll_name') === name) return cb(0);
+    renaming = true;
     call('PATCH', '/player/name', { name: name }, function (s) {
+      renaming = false;
       if (s === 1) return cb(1);
       if (s === 0) store.setItem('ll_name', name);
       cb(0);
@@ -86,6 +103,7 @@ function createClient(opts) {
   function table(diff, name, cb) {
     var key = BOARD_KEYS[diff];
     if (!config.gameKey || !key) return cb({ status: 2 });
+    wantName = name;
     syncName(name, function (s) {
       if (s) return cb({ status: s });
       call('GET', '/leaderboards/' + key + '/list?count=' + TOP_COUNT, null, function (s, list) {
@@ -102,10 +120,12 @@ function createClient(opts) {
   function submit(diff, nights, score, name, cb) {
     var key = BOARD_KEYS[diff];
     if (!config.gameKey || !key) return cb({ status: 2 });
+    wantName = name;
     syncName(name, function (s) {
       if (s) return cb({ status: s });
-      call('POST', '/leaderboards/' + key + '/submit',
-        { member_id: store.getItem('ll_player_id'), score: pack(nights, score) }, function (s) {
+      call('POST', '/leaderboards/' + key + '/submit', function () {
+        return { member_id: store.getItem('ll_player_id'), score: pack(nights, score) };
+      }, function (s) {
           if (s) return cb({ status: s });
           // The member entry holds what the board kept, which beats this run if the server knew better.
           member(key, function (s, me) {
