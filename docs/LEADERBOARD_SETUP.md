@@ -50,7 +50,7 @@ Fill it in:
 module.exports = {
   gameKey: 'dev_...',                         // Game Key from the console
   domain: 'https://xxxx.api.lootlocker.com',  // address from the console, with or without https://
-  gameVersion: '1.4.1'
+  gameVersion: '1.4.2'
 };
 ```
 
