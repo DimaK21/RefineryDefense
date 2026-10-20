@@ -6,6 +6,8 @@ An endless tower defense game for touchscreen Pebble watches. By day you build a
 oil refinery; by night you watch the drone raid come in and call in air strikes, EW pulses and
 flares. Survive as many nights as you can.
 
+**[Get it on the Pebble appstore](https://apps.repebble.com/00a95540142a497d84db5240)**
+
 - **Day:** build from six kinds of units — MG nests, Gepards, Tor and Patriot missile launchers, EW
   jammers and radars. Repair, rebuild and expand the refinery; each outlying object grants a bonus
   while it stands.
