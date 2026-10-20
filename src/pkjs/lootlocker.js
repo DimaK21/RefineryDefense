@@ -39,7 +39,8 @@ function createClient(opts) {
       });
   }
 
-  // One authenticated request; a 401 logs in again and retries once. cb(status, json)
+  // One authenticated request; a 401 or 403 logs in again and retries once. cb(status, json)
+  // LootLocker answers an expired session with 403 "invalid session token", not 401.
   // `empty` lists HTTP codes that count as success with no body.
   function call(method, path, body, cb, empty) {
     var relogged = false;
@@ -48,7 +49,7 @@ function createClient(opts) {
                       'x-session-token': store.getItem('ll_session') || '' };
       http(method, base + path, headers, body, function (err, status, json) {
         if (err) return cb(1);
-        if (status === 401 && !relogged) {
+        if ((status === 401 || status === 403) && !relogged) {
           relogged = true;
           return login(function (s) { return s ? cb(s) : attempt(); });
         }

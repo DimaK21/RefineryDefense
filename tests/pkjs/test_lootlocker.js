@@ -123,6 +123,22 @@ test('expired session: one relogin and retry', function () {
   assert.strictEqual(http.log.filter(function (c) { return c.path === '/v2/session/guest'; }).length, 1);
 });
 
+// What LootLocker really answers for an expired or ended session (checked against the live API).
+test('expired session answered with 403: one relogin and retry', function () {
+  var lists = 0;
+  var http = fakeHttp(baseRoutes({
+    'GET /leaderboards/normal/list': function () {
+      lists++;
+      return lists === 1 ? [403, { message: 'invalid session token' }] : [200, { items: [], pagination: { total: 0 } }];
+    }
+  }));
+  var store = memStore({ ll_session: 'old', ll_player_id: '777', ll_name: 'DIM' });
+  var r = sync(function (cb) { client(http, store).table(1, 'DIM', cb); });
+  assert.strictEqual(r.status, 0);
+  assert.strictEqual(lists, 2);
+  assert.strictEqual(http.log.filter(function (c) { return c.path === '/v2/session/guest'; }).length, 1);
+});
+
 test('401 twice is a server error, no login loop', function () {
   var http = fakeHttp(baseRoutes({ 'GET /leaderboards/normal/list': function () { return [401, {}]; } }));
   var r = sync(function (cb) { client(http).table(1, 'DIM', cb); });

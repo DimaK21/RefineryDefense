@@ -2,3 +2,4 @@ build/
 .lock-waf*
 .DS_Store
 src/pkjs/lootlocker_config.js
+.idea/
